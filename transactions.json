@@ -1,0 +1,110 @@
+[
+  {
+    "id": 1769876879831,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769876879.8310943
+  },
+  {
+    "id": 1769877535775,
+    "spot_id": 3,
+    "spot_name": "Osu Oxford Street Lot",
+    "price": 15,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769877535.7758465
+  },
+  {
+    "id": 1769877568198,
+    "spot_id": 2,
+    "spot_name": "Kotoka Airport Priority",
+    "price": 25,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769877568.198421
+  },
+  {
+    "id": 1769877839163,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769877839.1636603
+  },
+  {
+    "id": 1769877849886,
+    "spot_id": 3,
+    "spot_name": "Osu Oxford Street Lot",
+    "price": 15,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769877849.886194
+  },
+  {
+    "id": 1769878125861,
+    "spot_id": 1,
+    "spot_name": "Accra Mall Parking",
+    "price": 10,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769878125.86144
+  },
+  {
+    "id": 1769879187218,
+    "spot_id": 2,
+    "spot_name": "Kotoka Airport Priority",
+    "price": 25,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769879187.2186263
+  },
+  {
+    "id": 1769879862103,
+    "spot_id": 2,
+    "spot_name": "Kotoka Airport Priority",
+    "price": 25,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769879862.103282
+  },
+  {
+    "id": 1769882675145,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gwcvildll",
+    "timestamp": 1769882675.1456146
+  },
+  {
+    "id": 1769891004245,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOI",
+    "timestamp": 1769891004.2461843
+  },
+  {
+    "id": 1769892117891,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOI",
+    "timestamp": 1769892117.8916638
+  },
+  {
+    "id": 1769895260817,
+    "spot_id": 1,
+    "spot_name": "Accra Mall Parking",
+    "price": 10,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1769895260.8170567
+  }
+]

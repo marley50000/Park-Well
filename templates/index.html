@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="home-container">
+    <!-- Navbar -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <div
+                style="display: flex; gap: 0.5rem; align-items: center; background: rgba(17,24,39,0.8); padding: 0.5rem 1rem; border-radius: 99px; border: 1px solid rgba(255,255,255,0.1);">
+                <div style="background: #6366f1; border-radius: 4px; padding: 2px; display:flex;"><ion-icon
+                        name="car-sport" style="color:white;"></ion-icon></div>
+                <span style="font-weight: 700; color: white;">Park<span style="color: #6366f1;">Well</span></span>
+            </div>
+
+            <a href="/dashboard" class="glass-panel"
+                style="padding: 0.5rem 1rem; border-radius: 0.75rem; color: white; font-weight: 500; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
+                Owners <ion-icon name="arrow-forward"></ion-icon>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Map -->
+    <div id="map" class="map-bg"></div>
+
+    <!-- Search -->
+    <div class="search-container">
+        <div class="search-box">
+            <div class="search-input-wrapper">
+                <ion-icon name="search" style="color: #9ca3af; font-size: 1.25rem;"></ion-icon>
+                <input type="text" id="searchInput" class="search-input" placeholder="Search Accra locations...">
+                <button style="background: none; border: none; color: #6366f1; display: flex;"><ion-icon
+                        name="options"></ion-icon></button>
+            </div>
+            <div style="display: flex; gap: 0.5rem; overflow-x: auto; margin-top: 0.75rem; padding-bottom: 0.25rem;"
+                class="no-scrollbar">
+                <button class="filter-chip" data-val="All"
+                    style="padding: 4px 12px; border-radius: 99px; background: rgba(99,102,241,0.2); border: 1px solid #6366f1; color: white; font-size: 0.75rem;">All</button>
+                <button class="filter-chip" data-val="Nearby"
+                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Nearby</button>
+                <button class="filter-chip" data-val="Cheap"
+                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Lowest
+                    Price</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nav Controls -->
+    <div id="navControls" class="nav-controls">
+        <div class="nav-info-card">
+            <div>
+                <div style="font-size: 0.75rem; color: #9ca3af; margin-bottom: 0.25rem;">Navigate to</div>
+                <div id="navTargetName" style="font-weight: 700; font-size: 1.1rem;">Target</div>
+                <div id="navDistance" style="font-size: 0.875rem; color: #6366f1;">Calculating...</div>
+            </div>
+            <button onclick="stopNavigation()" class="btn-icon-only btn-danger-soft">
+                <ion-icon name="close"></ion-icon>
+            </button>
+        </div>
+    </div>
+
+    <!-- Spot Slider -->
+    <div class="spots-slider" id="spotsList">
+        <!-- Rendered via JS -->
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal-overlay hidden">
+        <div class="glass-card" style="width: 100%; max-width: 320px; background: #030712;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+                <h3 style="font-weight: 700; font-size: 1.1rem;">Confirm Booking</h3>
+                <button onclick="closeBookingModal()"
+                    style="background: none; border: none; color: white; font-size: 1.5rem;"><ion-icon
+                        name="close"></ion-icon></button>
+            </div>
+            <form id="bookingForm" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <input type="hidden" name="spot_id" id="bookingSpotId">
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Your
+                        Name</label>
+                    <input type="text" name="user_name" class="input-glass" placeholder="e.g. Ama Mensah" required>
+                </div>
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Phone
+                        Number</label>
+                    <input type="tel" name="user_phone" class="input-glass" placeholder="024 123 4567" required>
+                </div>
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Vehicle
+                        Plate</label>
+                    <input type="text" name="vehicle_plate" class="input-glass" placeholder="GW-2024-24" required>
+                </div>
+                <div
+                    style="background: rgba(99,102,241,0.1); padding: 0.75rem; border-radius: 0.5rem; margin-top: 0.5rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.25rem;">
+                        <span style="color: #9ca3af;">Rate</span>
+                        <span style="font-weight: 700;" id="bookingPrice">GH₵ 0/hr</span>
+                    </div>
+                    <div style="font-size: 0.75rem; color: #6366f1;">* Payment due on arrival</div>
+                </div>
+                <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 0.5rem;">Confirm
+                    Reservation</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="paymentModal" class="modal-overlay hidden">
+        <div class="glass-card" style="width: 100%; max-width: 320px; background: #030712; text-align: center;">
+            <div
+                style="width: 48px; height: 48px; background: rgba(255, 206, 86, 0.2); color: #fbbf24; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem auto;">
+                <ion-icon name="wallet" style="font-size: 24px;"></ion-icon>
+            </div>
+            <h3 style="font-weight: 700; font-size: 1.25rem; margin-bottom: 0.5rem;">Payment Required</h3>
+            <p style="color: #9ca3af; font-size: 0.875rem; margin-bottom: 1.5rem;">To finalize your spot, please send <b
+                    style="color: white;" id="payAmount">GH₵ 0</b> to:</p>
+
+            <div
+                style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 0.75rem; margin-bottom: 1.5rem; text-align: left;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: #9ca3af; font-size: 0.8rem;">Name</span>
+                    <span style="font-weight: 600;">Spark Dzakpasu</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <span style="color: #9ca3af; font-size: 0.8rem;">Number</span>
+                    <span style="font-weight: 600; color: #fbbf24;">0551389510</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #9ca3af; font-size: 0.8rem;">Reference</span>
+                    <span style="font-weight: 600; font-family: monospace;" id="payRef">PARK-001</span>
+                </div>
+            </div>
+
+            <button onclick="finishPayment()" class="btn-primary" style="width: 100%; justify-content: center;">I Have
+                Sent the Money</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt #{{ txn.id }} - ParkWell</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f3f4f6;
+            font-family: 'Space Mono', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            color: #1f2937;
+        }
+
+        .receipt-card {
+            background: white;
+            padding: 2rem;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .cut-line {
+            border-top: 2px dashed #d1d5db;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        .cut-line::before,
+        .cut-line::after {
+            content: '';
+            position: absolute;
+            top: -10px;
+            width: 20px;
+            height: 20px;
+            background-color: #f3f4f6;
+            border-radius: 50%;
+        }
+
+        .cut-line::before {
+            left: -30px;
+        }
+
+        .cut-line::after {
+            right: -30px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .logo span {
+            color: #6366f1;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .label {
+            color: #6b7280;
+        }
+
+        .value {
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .total {
+            margin-top: 1rem;
+            border-top: 2px solid #1f2937;
+            padding-top: 1rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .footer {
+            margin-top: 2rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        .actions {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-family: inherit;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-print {
+            background: #1f2937;
+            color: white;
+        }
+
+        .btn-print:hover {
+            background: #000;
+        }
+
+        .btn-share {
+            background: #e5e7eb;
+            color: #1f2937;
+        }
+
+        .btn-share:hover {
+            background: #d1d5db;
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+
+            .receipt-card {
+                box-shadow: none;
+                max-width: 100%;
+                border-radius: 0;
+                padding: 0;
+            }
+
+            .actions {
+                display: none;
+            }
+
+            .cut-line::before,
+            .cut-line::after {
+                display: none;
+            }
+        }
+    </style>
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+</head>
+
+<body>
+    <div class="receipt-card">
+        <div class="header">
+            <div class="logo"><ion-icon name="car-sport"></ion-icon> Park<span>Well</span></div>
+            <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #6b7280;">OFFICIAL RECEIPT</div>
+        </div>
+
+        <div class="row">
+            <span class="label">Date</span>
+            <span class="value" id="dateDisplay"></span>
+        </div>
+        <div class="row">
+            <span class="label">Transaction ID</span>
+            <span class="value">#{{ txn.id }}</span>
+        </div>
+        <div class="cut-line"></div>
+
+        <div class="row">
+            <span class="label">Customer</span>
+            <span class="value">{{ txn.user_name }}</span>
+        </div>
+        <div class="row">
+            <span class="label">Vehicle</span>
+            <span class="value">{{ txn.vehicle_plate }}</span>
+        </div>
+        <div class="row">
+            <span class="label">Location</span>
+            <span class="value">{{ txn.spot_name }}</span>
+        </div>
+        <div class="row">
+            <span class="label">Duration</span>
+            <span class="value">1 Hour (Standard)</span>
+        </div>
+
+        <div class="row total">
+            <span>TOTAL PAID</span>
+            <span>GH₵ {{ txn.price }}</span>
+        </div>
+
+        <div class="footer">
+            <p>Thank you for parking with us!</p>
+            <p style="margin-top: 0.5rem;">support@parkwell.gh</p>
+        </div>
+
+        <!-- QR Code Placeholder -->
+        <div style="text-align: center; margin-top: 2rem;">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=PARKWELL-{{ txn.id }}" alt="QR Code"
+                style="opacity: 0.8;">
+        </div>
+
+        <div class="actions">
+            <button class="btn btn-print" onclick="window.print()">
+                <ion-icon name="print" style="vertical-align: middle; margin-right: 5px;"></ion-icon> Download / Print
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Format Timestamp
+        const ts = {{ txn.timestamp }};
+        const date = new Date(ts * 1000);
+        document.getElementById('dateDisplay').innerText = date.toLocaleString();
+    </script>
+</body>
+
+</html>

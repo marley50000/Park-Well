@@ -1,0 +1,47 @@
+[
+  {
+    "id": 1,
+    "name": "Accra Mall Parking",
+    "lat": 5.6225,
+    "lng": -0.173,
+    "price": 10,
+    "available": 39,
+    "distance": "0.5 km"
+  },
+  {
+    "id": 2,
+    "name": "Kotoka Airport Priority",
+    "lat": 5.6055,
+    "lng": -0.169,
+    "price": 25,
+    "available": 9,
+    "distance": "1.2 km"
+  },
+  {
+    "id": 3,
+    "name": "Osu Oxford Street Lot",
+    "lat": 5.556,
+    "lng": -0.183,
+    "price": 15,
+    "available": 3,
+    "distance": "2.0 km"
+  },
+  {
+    "id": 4,
+    "name": "Labadi Beach Parking",
+    "lat": 5.568,
+    "lng": -0.145,
+    "price": 8,
+    "available": 71,
+    "distance": "5.0 km"
+  },
+  {
+    "id": 5,
+    "name": "Makola Market Safe Park",
+    "lat": 5.548,
+    "lng": -0.21,
+    "price": 5,
+    "available": 0,
+    "distance": "4.5 km"
+  }
+]

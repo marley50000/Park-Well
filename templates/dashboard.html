@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="db-container">
+    <!-- Sidebar -->
+    <div class="db-sidebar">
+        <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 2rem; padding: 0 0.5rem;">
+            <div style="background: #6366f1; border-radius: 4px; padding: 4px; display:flex;"><ion-icon name="car-sport"
+                    style="color:white;"></ion-icon></div>
+            <span style="font-weight: 700; color: white; font-size: 1.25rem;">Park<span
+                    style="color: #6366f1;">Well</span> <span
+                    style="font-size: 0.75rem; color: #9ca3af; border: 1px solid #374151; padding: 1px 4px; border-radius: 4px;">BIZ</span></span>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div id="nav-overview" class="nav-item active" onclick="switchTab('overview')"
+                style="display: flex; gap: 0.75rem; padding: 0.75rem; border-radius: 0.75rem; font-weight: 500; align-items: center; cursor: pointer;">
+                <ion-icon name="grid"></ion-icon> Overview
+            </div>
+            <div id="nav-analytics" class="nav-item" onclick="switchTab('analytics')"
+                style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; cursor: pointer;">
+                <ion-icon name="stats-chart"></ion-icon> Analytics
+            </div>
+            <div id="nav-revenue" class="nav-item" onclick="switchTab('revenue')"
+                style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; cursor: pointer;">
+                <ion-icon name="wallet"></ion-icon> Revenue
+            </div>
+            <a href="/"
+                style="margin-top: auto; display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; text-decoration: none;">
+                <ion-icon name="log-out"></ion-icon> Back to App
+            </a>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="db-content">
+        <header class="db-header">
+            <h1 style="font-size: 1.5rem; font-weight: 700;">Dashboard Overview</h1>
+            <button onclick="openModal()" class="btn-primary" style="display: flex; gap: 0.5rem; align-items: center;">
+                <ion-icon name="add"></ion-icon> Add New Lot
+            </button>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="glass-card">
+                <p style="color: #9ca3af; font-size: 0.875rem; font-weight: 500;">Total Revenue</p>
+                <h3 style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;" id="totalRevenue">GH₵ 0</h3>
+                <span
+                    style="color: #10b981; font-size: 0.75rem; font-weight: 700; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;">Live
+                    Data</span>
+            </div>
+            <div class="glass-card">
+                <p style="color: #9ca3af; font-size: 0.875rem; font-weight: 500;">Total Bookings</p>
+                <h3 style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;" id="totalBookings">0</h3>
+                <span style="color: #9ca3af; font-size: 0.75rem;">All time</span>
+            </div>
+            <div class="glass-card">
+                <p style="color: #9ca3af; font-size: 0.875rem; font-weight: 500;">Active Locations</p>
+                <h3 style="font-size: 2rem; font-weight: 700; margin-top: 0.25rem;" id="totalSpots">0</h3>
+                <span style="color: #9ca3af; font-size: 0.75rem;">Currently managed</span>
+            </div>
+        </div>
+
+        <div class="db-grid">
+            <!-- List -->
+            <div>
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Managed Locations</h3>
+                <div id="dashboardList" style="display: grid; gap: 1rem;">
+                    <!-- JS Rendered -->
+                </div>
+            </div>
+
+            <!-- Activity Feed -->
+            <div>
+                <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Live Activity</h3>
+                <div id="activityList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <!-- JS Rendered -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Modal -->
+<div id="addModal" class="modal-overlay hidden">
+    <div class="glass-card" style="width: 100%; max-width: 400px; background: #030712;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 style="font-weight: 700; font-size: 1.25rem;">Add New Lot</h3>
+            <button onclick="closeModal()"
+                style="background: none; border: none; color: white; font-size: 1.5rem;"><ion-icon
+                    name="close"></ion-icon></button>
+        </div>
+        <form id="addForm" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Name</label>
+                <input type="text" name="name" class="input-glass" placeholder="e.g. Osu Parking" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Price
+                        (GHC)</label>
+                    <input type="number" name="price" class="input-glass" placeholder="10" required>
+                </div>
+                <div>
+                    <label
+                        style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Capacity</label>
+                    <input type="number" name="available" class="input-glass" placeholder="50" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lat (e.g.
+                        5.603)</label>
+                    <input type="number" step="any" name="lat" class="input-glass" placeholder="5.6037" required>
+                </div>
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lng (e.g.
+                        -0.187)</label>
+                    <input type="number" step="any" name="lng" class="input-glass" placeholder="-0.1870" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">Create
+                Location</button>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal-overlay hidden">
+    <div class="glass-card" style="width: 100%; max-width: 400px; background: #030712;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+            <h3 style="font-weight: 700; font-size: 1.25rem;">Edit Location</h3>
+            <button onclick="closeEditModal()"
+                style="background: none; border: none; color: white; font-size: 1.5rem;"><ion-icon
+                    name="close"></ion-icon></button>
+        </div>
+        <form id="editForm" style="display: flex; flex-direction: column; gap: 1rem;">
+            <input type="hidden" name="id" id="editId">
+            <div>
+                <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Location
+                    Name</label>
+                <input type="text" name="name" id="editName" class="input-glass" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Price
+                        (GHC/hr)</label>
+                    <input type="number" name="price" id="editPrice" class="input-glass" required>
+                </div>
+                <div>
+                    <label
+                        style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Capacity</label>
+                    <input type="number" name="available" id="editAvailable" class="input-glass" required>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div>
+                    <label
+                        style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Latitude</label>
+                    <input type="text" name="lat" id="editLat" class="input-glass" required>
+                </div>
+                <div>
+                    <label
+                        style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.25rem;">Longitude</label>
+                    <input type="text" name="lng" id="editLng" class="input-glass" required>
+                </div>
+            </div>
+            <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 0.5rem;">Save
+                Changes</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
