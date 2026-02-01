@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 1. Initialize & Watch User
+    // 1. Initialize & Watch User
     function init() {
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(
@@ -68,6 +69,13 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log("Geolocation not supported");
             fetchSpots();
         }
+
+        // Real-Time Updates (Socket.IO)
+        const socket = io();
+        socket.on('data_update', (msg) => {
+            console.log("Live update:", msg);
+            fetchSpots(); // Refresh markers instantly
+        });
     }
 
     // 2. Fetch Data

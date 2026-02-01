@@ -3,9 +3,12 @@ import json
 import os
 import time
 from functools import wraps
+from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
 app.secret_key = 'parkwell_secret_key_ghana_living_legends' # Change in production
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 DATA_FILE = 'parking_data.json'
 TRANSACTIONS_FILE = 'transactions.json'
 
@@ -41,6 +44,7 @@ def login_required(f):
     return decorated_function
 
 # --- Routes ---
+# ... (Keep existing routes same until API) ...
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -88,6 +92,10 @@ def add_spot():
     
     data.append(new_spot)
     save_data(data)
+    
+    # Broadcast update
+    socketio.emit('data_update', {'type': 'spot_added'})
+    
     return jsonify(new_spot), 201
 
 @app.route('/api/spots/<int:spot_id>', methods=['PUT'])
@@ -106,6 +114,10 @@ def edit_spot(spot_id):
             spot['lat'] = float(updated_info.get('lat', spot['lat']))
             spot['lng'] = float(updated_info.get('lng', spot['lng']))
             save_data(data)
+            
+            # Broadcast update
+            socketio.emit('data_update', {'type': 'spot_updated'})
+            
             return jsonify({'success': True, 'spot': spot})
     
     return jsonify({'success': False, 'message': 'Spot not found'}), 404
@@ -118,6 +130,10 @@ def delete_spot(spot_id):
     data = load_data()
     data = [s for s in data if s['id'] != spot_id]
     save_data(data)
+    
+    # Broadcast update
+    socketio.emit('data_update', {'type': 'spot_deleted'})
+    
     return jsonify({'success': True})
 
 @app.route('/api/reserve/<int:spot_id>', methods=['POST'])
@@ -141,6 +157,9 @@ def reserve_spot(spot_id):
                     'timestamp': time.time()
                 }
                 save_transaction(txn)
+                
+                # Broadcast update (affects availability and revenue)
+                socketio.emit('data_update', {'type': 'reservation'})
                 
                 return jsonify({
                     'success': True, 
@@ -175,4 +194,4 @@ def get_analytics():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000)

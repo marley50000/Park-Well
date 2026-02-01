@@ -15,11 +15,18 @@ document.addEventListener('DOMContentLoaded', () => {
         console.warn("Chart failed to initialize (DOM element missing?):", e);
     }
 
-    // Auto-refresh every 5 seconds
-    setInterval(() => {
+    // --- Real-Time Updates (Socket.IO) ---
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log('Connected to real-time server');
+    });
+
+    socket.on('data_update', (msg) => {
+        console.log('Real-time update received:', msg);
         loadSpots();
         loadAnalytics();
-    }, 5000);
+    });
 
     // --- Event Listeners (that need DOM) ---
     const addForm = document.getElementById('addForm');

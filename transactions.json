@@ -115,5 +115,14 @@
     "user_name": "Spark Marley",
     "vehicle_plate": "RTIOIll",
     "timestamp": 1769976070.5707963
+  },
+  {
+    "id": 1769977003711,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1769977003.7111251
   }
 ]
