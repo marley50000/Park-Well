@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div
+    style="position: relative; height: 100vh; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: #030712;">
+
+    <!-- Animated Background -->
+    <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; overflow: hidden;">
+        <div
+            style="position: absolute; top: -20%; left: -10%; width: 60%; height: 60%; background: radial-gradient(circle, rgba(99,102,241,0.3) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; animation: float 10s infinite ease-in-out;">
+        </div>
+        <div
+            style="position: absolute; bottom: -20%; right: -10%; width: 70%; height: 70%; background: radial-gradient(circle, rgba(16,185,129,0.2) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; animation: float 15s infinite ease-in-out reverse;">
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div style="z-index: 10; padding: 2rem; max-width: 600px; width: 100%;">
+
+        <!-- Animated Logo Icon -->
+        <div style="margin-bottom: 2rem; display: inline-flex; position: relative;">
+            <div
+                style="width: 80px; height: 80px; background: linear-gradient(135deg, #6366f1, #818cf8); border-radius: 20px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px rgba(99,102,241,0.5); transform: rotate(-5deg); animation: logoFloat 6s ease-in-out infinite;">
+                <ion-icon name="car-sport" style="font-size: 40px; color: white;"></ion-icon>
+            </div>
+            <div
+                style="position: absolute; top: -10px; right: -10px; background: #10b981; padding: 0.25rem 0.75rem; border-radius: 99px; font-size: 0.8rem; font-weight: 700; color: white; box-shadow: 0 4px 10px rgba(16,185,129,0.4);">
+                LIVE
+            </div>
+        </div>
+
+        <h1
+            style="font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1rem; color: white; letter-spacing: -0.05em;">
+            Park <span
+                style="background: linear-gradient(to right, #6366f1, #a855f7); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Well.</span>
+        </h1>
+
+        <p style="font-size: 1.25rem; color: #9ca3af; margin-bottom: 3rem; line-height: 1.6;">
+            The smartest way to find secure parking in Accra. <br>
+            <span style="color: #e5e7eb;">Real-time availability. Instant booking.</span>
+        </p>
+
+        <!-- CTA Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+            <a href="/map" class="btn-primary"
+                style="padding: 1rem 3rem; font-size: 1.1rem; border-radius: 99px; width: 100%; max-width: 300px; text-decoration: none; justify-content: center; box-shadow: 0 0 20px rgba(99,102,241,0.4); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+                Find a Spot <ion-icon name="arrow-forward" style="margin-left: 0.5rem;"></ion-icon>
+            </a>
+
+            <a href="/dashboard"
+                style="color: #6b7280; font-size: 0.9rem; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 99px; transition: all 0.3s;">
+                Admin Access <ion-icon name="lock-closed-outline"></ion-icon>
+            </a>
+        </div>
+    </div>
+
+    <!-- Feature Ticker / Footer -->
+    <div
+        style="position: absolute; bottom: 0; width: 100%; padding: 2rem; background: linear-gradient(to top, #030712 20%, transparent); display: flex; justify-content: center; gap: 2rem; z-index: 10; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+            <ion-icon name="time-outline" style="color: #6366f1;"></ion-icon> Live Updates
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+            <ion-icon name="shield-checkmark-outline" style="color: #10b981;"></ion-icon> Secure Payment
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+            <ion-icon name="navigate-outline" style="color: #f59e0b;"></ion-icon> GPS Navigation
+        </div>
+    </div>
+
+</div>
+
+<style>
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translate(0, 0);
+        }
+
+        50% {
+            transform: translate(20px, -20px);
+        }
+    }
+
+    @keyframes logoFloat {
+
+        0%,
+        100% {
+            transform: translateY(0) rotate(-5deg);
+        }
+
+        50% {
+            transform: translateY(-10px) rotate(5deg);
+        }
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 0 30px rgba(99, 102, 241, 0.6) !important;
+    }
+</style>
+{% endblock %}

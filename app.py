@@ -47,6 +47,10 @@ def login_required(f):
 # ... (Keep existing routes same until API) ...
 @app.route('/')
 def home():
+    return render_template('welcome.html')
+
+@app.route('/map')
+def map_view():
     return render_template('index.html')
 
 @app.route('/login', methods=['GET', 'POST'])
