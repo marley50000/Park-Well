@@ -62,6 +62,22 @@
             </div>
         </div>
 
+        <!-- Charts Area -->
+        <div style="margin-bottom: 2rem;">
+            <div class="glass-card" style="padding: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700;">Revenue Trend</h3>
+                    <select class="input-glass" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                        <option>Last 24 Hours</option>
+                        <option>Last 7 Days</option>
+                    </select>
+                </div>
+                <div style="height: 300px; width: 100%;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+
         <div class="db-grid">
             <!-- List -->
             <div>
@@ -108,16 +124,25 @@
                     <input type="number" name="available" class="input-glass" placeholder="50" required>
                 </div>
             </div>
+
+            <!-- Map Picker -->
+            <div
+                style="height: 200px; width: 100%; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem; border: 1px solid var(--glass-border);">
+                <div id="addMap" style="height: 100%; width: 100%; background: #111;"></div>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
-                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lat (e.g.
-                        5.603)</label>
-                    <input type="number" step="any" name="lat" class="input-glass" placeholder="5.6037" required>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lat (Type
+                        or Pin)</label>
+                    <input type="number" step="any" name="lat" id="addLat" class="input-glass" placeholder="5.6037"
+                        required>
                 </div>
                 <div>
-                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lng (e.g.
-                        -0.187)</label>
-                    <input type="number" step="any" name="lng" class="input-glass" placeholder="-0.1870" required>
+                    <label style="display: block; color: #9ca3af; font-size: 0.75rem; margin-bottom: 0.5rem;">Lng (Type
+                        or Pin)</label>
+                    <input type="number" step="any" name="lng" id="addLng" class="input-glass" placeholder="-0.1870"
+                        required>
                 </div>
             </div>
             <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">Create
@@ -154,6 +179,13 @@
                     <input type="number" name="available" id="editAvailable" class="input-glass" required>
                 </div>
             </div>
+
+            <!-- Map Picker -->
+            <div
+                style="height: 200px; width: 100%; border-radius: 0.5rem; overflow: hidden; margin-bottom: 1rem; border: 1px solid var(--glass-border);">
+                <div id="editMap" style="height: 100%; width: 100%; background: #111;"></div>
+            </div>
+
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div>
                     <label
@@ -174,5 +206,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 {% endblock %}

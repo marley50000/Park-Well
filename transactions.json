@@ -106,5 +106,14 @@
     "user_name": "Spark Marley",
     "vehicle_plate": "RTIOIll",
     "timestamp": 1769895260.8170567
+  },
+  {
+    "id": 1769976070570,
+    "spot_id": 2,
+    "spot_name": "Kotoka Airport Priority",
+    "price": 25,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1769976070.5707963
   }
 ]
