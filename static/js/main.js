@@ -26,6 +26,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Initialize & Watch User
     // 1. Initialize & Watch User
     function init() {
+        // Secure Context Warning
+        if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            console.warn("Geolocation API requires Secure Context (HTTPS) on non-localhost origins.");
+        }
+
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition(
                 (position) => {
@@ -54,19 +59,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 (error) => {
                     console.error("Error watching location:", error);
-                    if (!userLocation) { // Only alert if we never got location
-                        alert("Could not get your location. Showing default/last known view.");
-                        fetchSpots();
-                    }
+                    // Don't alert repeatedly in watchPosition, but maybe show a visual indicator if critical
                 },
                 {
                     enableHighAccuracy: true,
-                    maximumAge: 1000,
-                    timeout: 27000
+                    maximumAge: 0,
+                    timeout: 30000
                 }
             );
         } else {
-            console.log("Geolocation not supported");
+            alert("Geolocation is not supported by your browser.");
             fetchSpots();
         }
 
@@ -100,6 +102,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 allSpots = spots;
                 renderSpots(spots);
+
+                // Check for Deep Link (QR Code Scan)
+                const urlParams = new URLSearchParams(window.location.search);
+                const deepLinkSpotId = urlParams.get('spot_id');
+
+                if (deepLinkSpotId) {
+                    const spot = spots.find(s => s.id == deepLinkSpotId);
+                    if (spot) {
+                        // Wait a bit for map to settle
+                        setTimeout(() => {
+                            map.setView([spot.lat, spot.lng], 18);
+                            if (markers[spot.id]) markers[spot.id].openPopup();
+
+                            // Auto-open booking modal as requested
+                            reserveSpot(spot.id, spot.price);
+                        }, 500);
+                    }
+                }
             });
     }
 
@@ -118,15 +138,80 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(markers).forEach(m => map.removeLayer(m));
         markers = {};
 
+        // --- PRIVACY & COMMITMENT LOGIC ---
         spots.forEach(spot => {
-            // Add Marker
-            const marker = L.marker([spot.lat, spot.lng]).addTo(map);
+            // Check if this spot is the ACTIVELY BOOKED one
+            const activeSession = JSON.parse(localStorage.getItem('activeSession'));
+            const isBookedByUser = activeSession && activeSession.spotId == spot.id;
+
+            let marker;
+            let typeColor = '#6366f1';
+            let typeIconName = 'car-sport';
+            if (spot.vehicle_type === 'bike') { typeColor = '#f59e0b'; typeIconName = 'bicycle'; }
+            if (spot.vehicle_type === 'truck') { typeColor = '#10b981'; typeIconName = 'bus'; }
+
+            if (isBookedByUser) {
+                // --- COMMITMENT MODE: EXACT PIN ---
+                const iconHtml = `
+                    <div style="background-color: ${typeColor}; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid white; box-shadow: 0 0 15px ${typeColor}; animation: bounce 1.5s infinite;">
+                        <ion-icon name="flag" style="color: black; font-size: 1.4rem;"></ion-icon>
+                    </div>`;
+
+                const customIcon = L.divIcon({
+                    className: 'custom-pin',
+                    html: iconHtml,
+                    iconSize: [34, 34],
+                    iconAnchor: [17, 34],
+                    popupAnchor: [0, -34]
+                });
+
+                marker = L.marker([spot.lat, spot.lng], { icon: customIcon }).addTo(map);
+            } else {
+                // --- DISCOVERY MODE: PRIVACY ZONE ---
+                // Render a circle representing the "Area/Zone"
+                marker = L.circle([spot.lat, spot.lng], {
+                    color: typeColor,
+                    fillColor: typeColor,
+                    fillOpacity: 0.15,
+                    radius: 120, // 120m radius fuzz
+                    weight: 1,
+                    dashArray: '4, 4'
+                }).addTo(map);
+            }
+
+            // --- NAME PROTECTION ---
+            const displayName = isBookedByUser ? spot.name : `<span style="font-style:italic; opacity:0.8;">🔒 Protected Zone</span>`;
+
+            // Popup Content
             marker.bindPopup(`
-                <div style="color: black; text-align: center;">
-                    <b>${spot.name}</b><br>
-                    ${spot.available} spots<br>
-                    GH₵ ${spot.price}/hr<br>
-                    <span style="font-size:0.8em; color: #666;">${spot.distance} away</span>
+                <div style="color: black; text-align: left; min-width: 200px; font-family: 'Inter', sans-serif;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <div style="font-weight: 800; font-size: 1.1rem;">${displayName}</div>
+                        <div style="background: ${isBookedByUser ? '#d1fae5' : '#f3f4f6'}; color: ${isBookedByUser ? '#065f46' : '#6b7280'}; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
+                            ${isBookedByUser ? 'UNLOCKED' : 'HIDDEN'}
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: #4b5563; font-size: 0.9rem;">
+                         <ion-icon name="${typeIconName}"></ion-icon> 
+                         <span>${spot.available} Spaces • GH₵ ${spot.price}/hr</span>
+                    </div>
+
+                    ${isBookedByUser ? `
+                        <div style="margin-bottom: 12px; padding: 8px; background: #ecfdf5; border-radius: 6px; border: 1px solid #10b981; font-size: 0.8rem; color: #065f46;">
+                            📍 Exact location revealed.
+                        </div>
+                        <button onclick="startAppNavigation({lat:${spot.lat}, lng:${spot.lng}, name:'${spot.name.replace(/'/g, "\\'")}'})" style="width: 100%; background: #10b981; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                            NAVIGATE TO ENTRANCE
+                        </button>
+                    ` : `
+                        <div style="margin-bottom: 12px; font-size: 0.8rem; color: #6b7280; font-style: italic;">
+                            <ion-icon name="lock-closed" style="vertical-align: middle;"></ion-icon> Exact name & location hidden.
+                        </div>
+                        <button onclick="reserveSpot(${spot.id}, ${spot.price})" style="width: 100%; background: #000; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: 700; cursor: pointer;">
+                            RESERVE TO UNLOCK
+                        </button>
+                    `}
                 </div>
             `);
             markers[spot.id] = marker;
@@ -134,42 +219,59 @@ document.addEventListener('DOMContentLoaded', () => {
             // External Maps Link (Fallback)
             const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}`;
 
-            // Add Card
+            // Card Logic - Reuse vars from above if possible or new ones
+            let cardLabel = 'Car';
+            let cardIcon = 'car-sport';
+            let cardColor = '#6366f1';
+
+            if (spot.vehicle_type === 'bike') {
+                cardLabel = 'Bike';
+                cardIcon = 'bicycle';
+                cardColor = '#f59e0b';
+            } else if (spot.vehicle_type === 'truck') {
+                cardLabel = 'Truck';
+                cardIcon = 'bus';
+                cardColor = '#10b981';
+            }
+
+            // Create Card
             const card = document.createElement('div');
-            card.className = 'spot-card-item';
+            card.className = 'spot-card';
             card.innerHTML = `
-                <div class="glass-card">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                        <div>
-                            <h3 style="font-weight: 700; font-size: 1.1rem; margin-bottom: 0.25rem;">${spot.name}</h3>
-                            <div style="display: flex; gap: 0.5rem; color: #9ca3af; font-size: 0.875rem; align-items: center;">
-                                <ion-icon name="location"></ion-icon> ${spot.distance}
-                                <a href="${navUrl}" target="_blank" style="color: #6366f1; text-decoration: none; margin-left: 0.5rem; font-size: 0.75rem; border: 1px solid rgba(99,102,241,0.3); padding: 2px 6px; border-radius: 4px;">Google Maps</a>
-                            </div>
-                        </div>
-                        <div style="background: rgba(99,102,241,0.1); color: #818cf8; padding: 4px 8px; border-radius: 6px; font-weight: 700; font-size: 0.875rem;">
-                            GH₵ ${spot.price}/hr
-                        </div>
+                <div class="glass-card" style="padding: 12px; display: flex; align-items: center; gap: 12px; border-left: 3px solid ${cardColor};">
+                    
+                    <!-- Icon Box -->
+                    <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: ${cardColor}; flex-shrink: 0;">
+                        <ion-icon name="${cardIcon}" style="font-size: 1.5rem;"></ion-icon>
                     </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; gap: 0.5rem;">
-                         <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <div style="width: 8px; height: 8px; border-radius: 50%; background: ${spot.available > 0 ? '#10b981' : '#ef4444'}; box-shadow: 0 0 10px ${spot.available > 0 ? '#10b981' : '#ef4444'};"></div>
-                            <span style="font-size: 0.875rem; color: #9ca3af; font-weight: 500;">
-                                ${spot.available > 0 ? spot.available + ' spots' : 'Full'}
-                            </span>
+
+                    <!-- Info -->
+                    <div style="flex-grow: 1; min-width: 0;">
+                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                            <h3 style="font-weight: 700; font-size: 1rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayName}</h3>
+                            ${getTrustBadgeHTML(spot.trust_level)}
                         </div>
                         
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button onclick='startAppNavigation(${JSON.stringify(spot).replace(/'/g, "&#39;")})' class="btn-primary" style="background: white; color: #6366f1; box-shadow: none; padding: 0.5rem 0.75rem;">
-                                <ion-icon name="navigate" style="font-size: 1.1rem;"></ion-icon>
-                            </button>
-                            <button onclick="reserveSpot(${spot.id}, ${spot.price})" class="btn-primary" ${spot.available < 1 ? 'disabled' : ''}>
-                                Reserve
+                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #9ca3af;">
+                            <span style="color: ${cardColor}; font-weight: 600; text-transform: uppercase; font-size: 0.65rem; border: 1px solid ${cardColor}40; padding: 1px 4px; border-radius: 4px;">${cardLabel}</span>
+                            <span>• ${spot.distance}</span>
+                            <span>• ${spot.available} spots</span>
+                        </div>
+                    </div>
+
+                    <!-- Action -->
+                    <div style="text-align: right; flex-shrink: 0;">
+                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 4px;">GH₵ ${spot.price}</div>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="${navUrl}" target="_blank" style="background: rgba(255,255,255,0.1); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white;">
+                                <ion-icon name="navigate" style="font-size: 0.9rem;"></ion-icon>
+                            </a>
+                            <button onclick="reserveSpot(${spot.id}, ${spot.price})" style="background: #6366f1; border: none; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer;">
+                                <ion-icon name="arrow-forward"></ion-icon>
                             </button>
                         </div>
                     </div>
-                </div>
-            `;
+                </div>`;
             listEl.appendChild(card);
         });
 
@@ -276,6 +378,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return deg * (Math.PI / 180)
     }
 
+    function getTrustBadgeHTML(level) {
+        if (level === 1) return '<span style="display:inline-block; vertical-align:middle; background: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 1px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; border: 1px solid rgba(251, 191, 36, 0.3); margin-left: 6px;">GOLD <ion-icon name="checkmark-circle"></ion-icon></span>';
+        if (level === 2) return '<span style="display:inline-block; vertical-align:middle; background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 1px 4px; border-radius: 4px; font-size: 0.65rem; font-weight: 700; border: 1px solid rgba(148, 163, 184, 0.3); margin-left: 6px;">SILVER <ion-icon name="shield-checkmark"></ion-icon></span>';
+        return '';
+    }
+
     // Search & Filter Logic
     let currentFilter = 'All';
     let searchTerm = '';
@@ -291,6 +399,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (currentFilter === 'Cheap') {
             filtered.sort((a, b) => a.price - b.price);
+        } else if (currentFilter === 'Bike') {
+            filtered = filtered.filter(s => s.vehicle_type === 'bike');
+        } else if (currentFilter === 'Truck') {
+            filtered = filtered.filter(s => s.vehicle_type === 'truck');
         }
 
         renderSpots(filtered);
@@ -305,29 +417,222 @@ document.addEventListener('DOMContentLoaded', () => {
     // Filter Chips
     document.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', (e) => {
-            // Update UI
-            document.querySelectorAll('.filter-chip').forEach(b => {
-                b.style.background = 'rgba(255,255,255,0.05)';
-                b.style.borderColor = 'rgba(255,255,255,0.1)';
-                b.style.color = '#9ca3af';
-            });
-            e.target.style.background = 'rgba(99,102,241,0.2)';
-            e.target.style.borderColor = '#6366f1';
-            e.target.style.color = 'white';
-
-            // Update Logic
-            currentFilter = e.target.dataset.val;
-            applyFilters();
+            activateFilter(e.target);
         });
     });
 
+    function activateFilter(targetBlock) {
+        // Reset UI
+        document.querySelectorAll('.filter-chip').forEach(b => {
+            b.style.background = 'rgba(255,255,255,0.05)';
+            b.style.borderColor = 'rgba(255,255,255,0.1)';
+            b.style.color = '#9ca3af';
+        });
+        // Activate Target
+        targetBlock.style.background = 'rgba(99,102,241,0.2)';
+        targetBlock.style.borderColor = '#6366f1';
+        targetBlock.style.color = 'white';
+
+        currentFilter = targetBlock.dataset.val;
+        applyFilters();
+    }
+
+    // --- VOICE AI LOGIC ---
+    let recognition = null;
+
+    window.startVoiceSearch = () => {
+        if (!('webkitSpeechRecognition' in window)) {
+            alert("Voice search not supported. Try using Google Chrome.");
+            return;
+        }
+
+        // Stop any previous instance
+        if (recognition) {
+            recognition.abort();
+            recognition = null;
+        }
+
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 5; // Reduced from 10 used to save bandwidth
+
+        const micBtn = document.getElementById('voiceBtn');
+        const searchInput = document.getElementById('searchInput');
+
+        try {
+            recognition.start();
+            micBtn.style.color = '#ef4444';
+            micBtn.style.transform = 'scale(1.2)';
+            searchInput.placeholder = "Listening...";
+        } catch (e) {
+            console.error("Mic start error", e);
+        }
+
+        recognition.onresult = (event) => {
+            const results = event.results[0];
+            let command = results[0].transcript.toLowerCase();
+
+            // --- SMART CONVERSATIONAL LOGIC ---
+
+            const bikeKeywords = ['bike', 'motor', 'cycle', 'scooter', 'moped', 'two wheel', 'bicycles'];
+            const truckKeywords = ['truck', 'bus', 'van', 'lorry', 'trailer', 'heavy', 'large', 'big'];
+            const cheapKeywords = ['cheap', 'low', 'budget', 'affordable', 'least', 'price', 'economy'];
+            const carKeywords = ['car', 'auto', 'sedan', 'suv', 'taxi', 'vehicle', 'reset', 'clear'];
+
+            let detectedFilter = 'All';
+
+            // 1. Pick the best alternative that matches a keyword (if any)
+            // If the user said "Find bike", but top result is "Find Mike", we want to switch 'command' to "Find bike"
+            for (let i = 0; i < results.length; i++) {
+                const alt = results[i].transcript.toLowerCase();
+                if ([...bikeKeywords, ...truckKeywords, ...cheapKeywords, ...carKeywords].some(k => alt.includes(k))) {
+                    command = alt;
+                    break;
+                }
+            }
+
+            // 2. Detect Filter from final Command
+            if (bikeKeywords.some(k => command.includes(k))) detectedFilter = 'Bike';
+            else if (truckKeywords.some(k => command.includes(k))) detectedFilter = 'Truck';
+            else if (cheapKeywords.some(k => command.includes(k))) detectedFilter = 'Cheap';
+
+            // 3. Activate Filter UI
+            if (detectedFilter !== 'All') {
+                const btn = document.querySelector(`.filter-chip[data-val="${detectedFilter}"]`);
+                if (btn) activateFilter(btn);
+            } else {
+                if (carKeywords.some(k => command.includes(k))) {
+                    const btn = document.querySelector('.filter-chip[data-val="All"]');
+                    if (btn) activateFilter(btn);
+                }
+            }
+
+            // 4. Extract "Search Intent" (Location/Name)
+            // Remove the detected category keywords AND filler words to find the "place"
+            let cleanText = command;
+            const fillers = ['find', 'show me', 'show', 'search', 'looking for', 'i want', 'parking', 'spot', 'place', ' me ', ' a ', ' the ', ' in ', ' at ', 'near', 'please'];
+
+            fillers.forEach(f => cleanText = cleanText.replace(f, ' '));
+
+            if (detectedFilter === 'Bike') bikeKeywords.forEach(k => cleanText = cleanText.replace(k, ' '));
+            if (detectedFilter === 'Truck') truckKeywords.forEach(k => cleanText = cleanText.replace(k, ' '));
+            if (detectedFilter === 'Cheap') cheapKeywords.forEach(k => cleanText = cleanText.replace(k, ' '));
+            carKeywords.forEach(k => cleanText = cleanText.replace(k, ' '));
+
+            cleanText = cleanText.replace(/\s+/g, ' ').trim(); // Collapse spaces
+
+            console.log("Voice:", command, "-> Filter:", detectedFilter, "-> Search:", cleanText);
+
+            // 5. Apply Search
+            if (cleanText.length > 2) {
+                searchInput.value = cleanText;
+                searchTerm = cleanText;
+            } else {
+                searchInput.value = ""; // Just a category command, clear text
+                searchTerm = "";
+            }
+
+            applyFilters();
+            resetMicUI();
+        };
+
+        recognition.onspeechend = () => {
+            recognition.stop();
+            resetMicUI();
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech Error:", event.error);
+            resetMicUI();
+
+            if (event.error === 'network') {
+                searchInput.value = "";
+                searchInput.placeholder = "Offline/Network Error. Type instead.";
+            } else if (event.error === 'not-allowed') {
+                alert("Microphone access blocked. Please allow permissions.");
+            }
+        };
+
+        function resetMicUI() {
+            micBtn.style.color = '#6366f1';
+            micBtn.style.transform = 'scale(1)';
+            // Keep the placeholder or value logic clean
+            if (searchInput.placeholder === "Listening...") {
+                searchInput.placeholder = "Search or say 'Find Bike'...";
+            }
+        }
+    };
+
+    // --- WALLET SYSTEM ---
+    const DEPOSIT_AMOUNT = 20.00; // Advance Hold
+
+    function initWallet() {
+        let balance = localStorage.getItem('userWalletBalance');
+        if (!balance) {
+            balance = 50.00; // Free money for demo
+            localStorage.setItem('userWalletBalance', balance);
+        }
+        updateWalletUI(balance);
+    }
+
+    function updateWalletUI(balance) {
+        if (balance === undefined) balance = localStorage.getItem('userWalletBalance');
+        const el = document.getElementById('userWallet');
+        if (el) el.innerText = 'GH₵ ' + parseFloat(balance).toFixed(2);
+    }
+
     // Modal Logic
     const bookingModal = document.getElementById('bookingModal');
+    let currentSpotRate = 0;
 
     window.openBookingModal = (spotId, price) => {
         document.getElementById('bookingSpotId').value = spotId;
-        document.getElementById('bookingPrice').innerText = 'GH₵ ' + price + '/hr';
+        currentSpotRate = price;
+        updateBookingPrice(); // Init with 1 hour
         bookingModal.classList.remove('hidden');
+    };
+
+    window.updateBookingPrice = () => {
+        let duration = 1;
+        const selectVal = document.getElementById('bookingDuration').value;
+
+        if (selectVal === 'custom') {
+            const customVal = document.getElementById('customDurationInput').value;
+            duration = customVal ? parseInt(customVal) : 0;
+        } else {
+            duration = parseInt(selectVal);
+        }
+
+        const total = (currentSpotRate * duration).toFixed(2);
+
+        // Show Breakdown: Base + Deposit
+        const toPay = parseFloat(total) + DEPOSIT_AMOUNT;
+
+        const priceEl = document.getElementById('bookingPrice');
+        if (priceEl) {
+            priceEl.innerHTML = `
+                <div style="text-align:right">
+                    <div>GH₵ ${total}</div>
+                    <div style="font-size:0.7rem; color:#9ca3af; font-weight:400;">+ GH₵ ${DEPOSIT_AMOUNT.toFixed(2)} Hold</div>
+                    <div style="font-size:0.8rem; color:#fbbf24; border-top:1px solid rgba(255,255,255,0.1); margin-top:2px; padding-top:2px;">Total: GH₵ ${toPay.toFixed(2)}</div>
+                </div>
+            `;
+        }
+    };
+
+    window.toggleCustomDuration = () => {
+        const select = document.getElementById('bookingDuration');
+        const customInput = document.getElementById('customDurationInput');
+
+        if (select.value === 'custom') {
+            customInput.classList.remove('hidden');
+            customInput.focus();
+            updateBookingPrice();
+        } else {
+            customInput.classList.add('hidden');
+            updateBookingPrice();
+        }
     };
 
     window.closeBookingModal = () => bookingModal.classList.add('hidden');
@@ -335,21 +640,49 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle Reservation
     document.getElementById('bookingForm').addEventListener('submit', (e) => {
         e.preventDefault();
-        console.log("Submitting booking form...");
 
         const formData = new FormData(e.target);
         const spotId = formData.get('spot_id');
 
+        let duration = 0;
+        if (document.getElementById('bookingDuration').value === 'custom') {
+            duration = parseInt(formData.get('custom_duration'));
+        } else {
+            duration = parseInt(formData.get('duration_select'));
+        }
+
+        if (!duration || duration <= 0) {
+            alert("Please enter a valid duration.");
+            return;
+        }
+
+        const baseAmount = currentSpotRate * duration;
+        const totalCharge = baseAmount + DEPOSIT_AMOUNT;
+
+        let wallet = parseFloat(localStorage.getItem('userWalletBalance'));
+        // If wallet implementation not found, init it 
+        if (isNaN(wallet)) { wallet = 50.00; localStorage.setItem('userWalletBalance', wallet); }
+
+        if (wallet < totalCharge) {
+            alert(`Insufficient Balance!\n\nWallet: GH₵ ${wallet.toFixed(2)}\nRequired: GH₵ ${totalCharge.toFixed(2)}\n(Includes GH₵ ${DEPOSIT_AMOUNT} deposit)`);
+            return;
+        }
+
         const bookingData = {
             user_name: formData.get('user_name'),
             user_phone: formData.get('user_phone'),
-            vehicle_plate: formData.get('vehicle_plate')
+            vehicle_plate: formData.get('vehicle_plate'),
+            duration: duration,
+            amount: baseAmount
         };
 
         if (!spotId) {
             alert("Error: Missing Spot ID");
             return;
         }
+
+        // Mock backend call success for UI demo (since payment is manual)
+        // In real app, we'd send to backend here. For now, we simulate success to show the enforcement features.
 
         fetch(`/api/reserve/${spotId}`, {
             method: 'POST',
@@ -375,25 +708,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Define finish callback
                     window.finishPayment = () => {
-                        // Success State
-                        const modalContent = payModal.querySelector('.glass-card');
-                        modalContent.innerHTML = `
-                            <div style="text-align: center; padding: 2rem 0;">
-                                <div style="font-size: 3rem; color: #10b981; margin-bottom: 1rem;">
-                                    <ion-icon name="checkmark-circle"></ion-icon>
-                                </div>
-                                <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">Booking Confirmed!</h3>
-                                <p style="color: #9ca3af; margin-bottom: 2rem;">Your spot has been secured.</p>
-                                
-                                <a href="/receipt/${res.transaction_id}" target="_blank" class="btn-primary" style="display: inline-flex; justify-content: center; text-decoration: none; margin-bottom: 1rem; width: 100%;">
-                                    <ion-icon name="receipt"></ion-icon> Download Receipt
-                                </a>
-                                
-                                <button onclick="location.reload()" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; padding: 0.75rem; border-radius: 0.5rem; cursor: pointer; width: 100%;">
-                                    Close & Return
-                                </button>
-                            </div>
-                        `;
+                        // DEDUCT WALLET
+                        let wallet = parseFloat(localStorage.getItem('userWalletBalance'));
+                        // Ensure it exists
+                        if (isNaN(wallet)) wallet = 50.00;
+
+                        wallet -= totalCharge;
+                        localStorage.setItem('userWalletBalance', wallet);
+                        updateWalletUI(wallet);
+
+                        alert(`✅ Payment Successful\n\nPaid: GH₵ ${bookingData.amount.toFixed(2)}\nHeld: GH₵ ${DEPOSIT_AMOUNT.toFixed(2)}`);
+
+                        // 1. SAVE SESSION DATA
+                        const parkedSpot = allSpots.find(s => s.id == spotId);
+                        const startTime = Date.now();
+                        const expiryTime = startTime + (duration * 60 * 60 * 1000);
+
+                        // Just for testing, let's make 1 hour = 1 minute so user can see it expire fast?
+                        // Uncomment next line for DEMO MODE (1 Hour = 60 Seconds)
+                        // const expiryTime = startTime + (duration * 60 * 1000); 
+
+                        const sessionData = {
+                            depositHeld: DEPOSIT_AMOUNT,
+                            spotId: spotId,
+                            lat: parkedSpot ? parkedSpot.lat : 0,
+                            lng: parkedSpot ? parkedSpot.lng : 0,
+                            name: parkedSpot ? parkedSpot.name : 'Unknown Spot',
+                            startTime: startTime,
+                            expiryTime: expiryTime,
+                            plate: bookingData.vehicle_plate
+                        };
+
+                        localStorage.setItem('activeSession', JSON.stringify(sessionData));
+
+                        // 2. Hide Payment Modal
+                        payModal.classList.add('hidden');
+
+                        // 3. Start Enforcer
+                        startSessionMonitor();
+
+                        alert("Payment Verified! Timer Started.");
                     }
                 } else {
                     alert("Booking Failed: " + res.message);
@@ -405,10 +759,209 @@ document.addEventListener('DOMContentLoaded', () => {
             });
     });
 
-    window.reserveSpot = (id, price) => { // Updated signature
+    window.reserveSpot = (id, price) => {
         openBookingModal(id, price);
+    };
+
+    // --- ENFORCEMENT SYSTEM (Silent but Deadly) ---
+    function startSessionMonitor() {
+        const session = JSON.parse(localStorage.getItem('activeSession'));
+        if (!session) return;
+
+        // Create/Update UI Widget
+        let widget = document.getElementById('sessionWidget');
+        if (!widget) {
+            widget = document.createElement('div');
+            widget.id = 'sessionWidget';
+            widget.className = 'glass-card';
+            widget.style.cssText = 'position: fixed; bottom: 20px; left: 20px; right: 20px; z-index: 2000; padding: 1rem; border: 1px solid #6366f1; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); animate: slideUp 0.5s;';
+            document.body.appendChild(widget);
+        }
+
+        // Update Loop
+        if (window.sessionInterval) clearInterval(window.sessionInterval);
+
+        window.sessionInterval = setInterval(() => {
+            const now = Date.now();
+            const timeLeft = session.expiryTime - now;
+
+            // Overtime Logic
+            let isOvertime = timeLeft < 0;
+            let statusHTML = '';
+            let actionBtn = '';
+
+            if (!isOvertime) {
+                // NORMAL TIME
+                const minutesLeft = Math.ceil(timeLeft / 60000);
+                const hours = Math.floor(minutesLeft / 60);
+                const mins = minutesLeft % 60;
+
+                let color = '#10b981'; // Green
+                if (minutesLeft < 15) color = '#f59e0b'; // Warn
+                if (minutesLeft < 5) color = '#ef4444'; // Critical
+
+                statusHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                        <span style="color:#9ca3af; font-size:0.8rem;">Session Active • ${session.plate}</span>
+                        <div style="background:${color}; color:#000; font-weight:800; padding:2px 8px; border-radius:4px; font-size:0.75rem;">LIVE</div>
+                    </div>
+                    <div style="font-size:2rem; font-weight:800; color:white; font-variant-numeric: tabular-nums;">
+                         ${hours}h ${mins}m <span style="font-size:1rem; color:#6b7280;">remaining</span>
+                    </div>
+                    <div style="font-size:0.8rem; color:#9ca3af;">${session.name}</div>
+                `;
+            } else {
+                // OVERTIME (The "Deadly" Part)
+                const overtimeMs = Math.abs(timeLeft);
+                const overtimeMins = Math.ceil(overtimeMs / 60000);
+
+                // Pricing Model: 1st 30m = GHS 8, Next 30m = GHS 12
+                // Simplified: GHS 8 base + GHS 0.5 per minute after 30
+                let penalty = 0;
+                if (overtimeMins <= 30) penalty = 8;
+                else penalty = 8 + ((overtimeMins - 30) * 0.5); // Accrue fast!
+
+                statusHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+                        <span style="color:#ef4444; font-weight:700; font-size:0.9rem;">⚠️ OVERTIME ACTIVE</span>
+                        <div style="background:#ef4444; color:white; font-weight:800; padding:2px 8px; border-radius:4px; font-size:0.75rem;">FINE ACCRUING</div>
+                    </div>
+                    <div style="font-size:2rem; font-weight:800; color:#ef4444; font-variant-numeric: tabular-nums;">
+                         +${overtimeMins}m <span style="font-size:1rem; color:#9ca3af;">overdue</span>
+                    </div>
+                    <div style="margin-top:0.5rem; padding:0.5rem; background:rgba(239,68,68,0.1); border:1px solid #ef4444; border-radius:6px; color:#fca5a5; font-weight:700;">
+                        Current Penalty: GH₵ ${penalty.toFixed(2)}
+                    </div>
+                `;
+            }
+
+            widget.innerHTML = `
+                ${statusHTML}
+                <button onclick="checkoutSession()" style="width:100%; margin-top:1rem; background:white; color:black; font-weight:800; padding:12px; border-radius:8px; border:none; cursor:pointer;">
+                    I HAVE LEFT THE SPOT (CHECKOUT)
+                </button>
+            `;
+
+        }, 1000);
+    }
+
+    // 4. CHECKOUT (GPS Location Proof + Refund)
+    window.checkoutSession = () => {
+        if (!confirm("Are you sure you have left the parking spot? We will verify your location.")) return;
+
+        const session = JSON.parse(localStorage.getItem('activeSession'));
+        if (!session) return;
+
+        // Use userLocation from main scope
+        if (!userLocation) {
+            alert("GPS Signal Lost. Cannot verify departure. Please move to an open area.");
+            return;
+        }
+
+        const dist = getDistanceFromLatLonInKm(userLocation.lat, userLocation.lng, session.lat, session.lng);
+        const distMeters = dist * 1000;
+
+        // MUST be at least 100m away to prove they left
+        if (distMeters < 50) { // 50m tolerance
+            alert(`❌ CHECKOUT REJECTED\n\nYou are still ${Math.round(distMeters)}m from the spot.\nPlease drive away before ending the session to avoid penalties.`);
+            return;
+        }
+
+        // --- REFUND CALCULATION ---
+        const now = Date.now();
+        const timeLeft = session.expiryTime - now;
+        let deposit = session.depositHeld || 0;
+        let refund = 0;
+        let penalty = 0;
+        let message = "";
+
+        if (timeLeft >= 0) {
+            // No Overtime -> Full Refund
+            refund = deposit;
+            message = `✅ ON TIME! Full Deposit Refunded: GH₵ ${refund.toFixed(2)}`;
+        } else {
+            // Overtime
+            const overtimeMins = Math.ceil(Math.abs(timeLeft) / 60000);
+
+            // Penalty: Base 8 + 0.5/min after 30
+            if (overtimeMins <= 30) penalty = 8;
+            else penalty = 8 + ((overtimeMins - 30) * 0.5);
+
+            if (deposit >= penalty) {
+                refund = deposit - penalty;
+                const paidFine = penalty;
+                message = `⚠️ OVERTIME (${overtimeMins}m)\nFine Deducted: GH₵ ${paidFine.toFixed(2)}\nRefund: GH₵ ${refund.toFixed(2)}`;
+            } else {
+                refund = 0;
+                const extraOwed = penalty - deposit;
+                message = `❌ MAJOR OVERSTAY (${overtimeMins}m)\nFine: GH₵ ${penalty.toFixed(2)}\nDeposit Used Full. You owe GH₵ ${extraOwed.toFixed(2)} (Added to Debt)`;
+            }
+        }
+
+        // Update Wallet
+        let wallet = parseFloat(localStorage.getItem('userWalletBalance'));
+        if (isNaN(wallet)) wallet = 0;
+        wallet += refund;
+        localStorage.setItem('userWalletBalance', wallet);
+        updateWalletUI(wallet);
+
+        // Success Cleanup
+        clearInterval(window.sessionInterval);
+        document.getElementById('sessionWidget').remove();
+        localStorage.removeItem('activeSession');
+
+        alert(`SESSION CLOSED\n\nCheckout confirmed. You are ${Math.round(distMeters)}m away.\n\n${message}\n\nNew Wallet Balance: GH₵ ${wallet.toFixed(2)}`);
+
+        // In real app, send API call to /api/checkout to free the spot
     };
 
     // Start App
     init();
+    initWallet();
+    startSessionMonitor(); // specific check on load
 });
+
+// Removed old checkParkedCar/findMyCar logic as it overlaps with new session logic or kept separate? 
+// Keeping findMyCar separate for now as it's useful.
+
+function checkParkedCar() {
+    const saved = localStorage.getItem('parkedCar');
+    let btn = document.getElementById('myCarBtn');
+
+    if (saved) {
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'myCarBtn';
+            btn.className = 'btn-primary';
+            btn.style.cssText = 'position: fixed; bottom: 100px; right: 20px; z-index: 1000; box-shadow: 0 4px 15px rgba(99,102,241,0.5); border-radius: 99px; padding: 12px 24px; font-weight: 700; animate: bounceIn 0.5s;';
+            btn.innerHTML = '<ion-icon name="navigate-circle" style="margin-right: 8px; font-size: 1.2rem;"></ion-icon> Find My Vehicle';
+            btn.onclick = window.findMyCar;
+            document.body.appendChild(btn);
+        }
+    } else {
+        if (btn) btn.remove();
+    }
+}
+
+window.findMyCar = () => {
+    const saved = JSON.parse(localStorage.getItem('parkedCar'));
+    if (!saved) return;
+
+    // Use existing nav logic but targeting the return trip
+    const dummySpot = {
+        lat: saved.lat,
+        lng: saved.lng,
+        name: "My Vehicle (" + saved.name + ")",
+        price: 0,
+        available: 1
+    };
+
+    // Reuse startAppNavigation
+    startAppNavigation(dummySpot);
+
+    // Optionally clear it after arrival? Or keep until manually cleared
+    if (confirm("Have you reached your vehicle? Click OK to clear this saved spot.")) {
+        localStorage.removeItem('parkedCar');
+        checkParkedCar();
+    }
+};

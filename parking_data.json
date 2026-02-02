@@ -6,7 +6,9 @@
     "lng": -0.173,
     "price": 10,
     "available": 39,
-    "distance": "0.5 km"
+    "distance": "0.5 km",
+    "trust_level": 1,
+    "qr_code_id": "ACC-MALL-001"
   },
   {
     "id": 2,
@@ -15,7 +17,9 @@
     "lng": -0.169,
     "price": 25,
     "available": 8,
-    "distance": "1.2 km"
+    "distance": "1.2 km",
+    "trust_level": 1,
+    "qr_code_id": "ACC-APT-002"
   },
   {
     "id": 3,
@@ -24,7 +28,9 @@
     "lng": -0.183,
     "price": 15,
     "available": 3,
-    "distance": "2.0 km"
+    "distance": "2.0 km",
+    "trust_level": 1,
+    "qr_code_id": "OSU-OCT-003"
   },
   {
     "id": 4,
@@ -32,8 +38,10 @@
     "lat": 5.568,
     "lng": -0.145,
     "price": 8,
-    "available": 70,
-    "distance": "5.0 km"
+    "available": 68,
+    "distance": "5.0 km",
+    "trust_level": 1,
+    "qr_code_id": "LAB-BCH-004"
   },
   {
     "id": 5,
@@ -42,6 +50,108 @@
     "lng": -0.21,
     "price": 5,
     "available": 0,
-    "distance": "4.5 km"
+    "distance": "4.5 km",
+    "trust_level": 2,
+    "qr_code_id": "MAK-MKT-005"
+  },
+  {
+    "name": "Pamlwine (Bush Canteen)",
+    "price": 13.0,
+    "available": 22,
+    "lat": 5.575277,
+    "lng": -0.154253,
+    "trust_level": 1,
+    "owner_lat": "5.5752765",
+    "owner_lng": "-0.154253",
+    "id": 6,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-1EE52899"
+  },
+  {
+    "name": "Pamlwine (2)",
+    "price": 13.0,
+    "available": 23,
+    "lat": 5.59651,
+    "lng": -0.201015,
+    "trust_level": 3,
+    "owner_lat": "",
+    "owner_lng": "",
+    "id": 7,
+    "distance": "0.5 km",
+    "gps_locked": false,
+    "qr_code_id": "PW-BA060CFA"
+  },
+  {
+    "name": "Pamlwine 3)",
+    "price": 13.0,
+    "available": 24,
+    "lat": 5.574599,
+    "lng": -0.152049,
+    "trust_level": 3,
+    "owner_lat": "5.5752765",
+    "owner_lng": "-0.154253",
+    "id": 8,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-67EC3CD3"
+  },
+  {
+    "name": "Pamlwine 4)",
+    "price": 13.0,
+    "available": 24,
+    "lat": 5.600781,
+    "lng": -0.203247,
+    "trust_level": 3,
+    "owner_lat": "5.5752765",
+    "owner_lng": "-0.154253",
+    "id": 9,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-E582E2B1"
+  },
+  {
+    "name": "Pamlwine 5",
+    "price": 13.0,
+    "available": 24,
+    "lat": 5.574962,
+    "lng": -0.153932,
+    "trust_level": 3,
+    "owner_lat": "5.5752765",
+    "owner_lng": "-0.154253",
+    "id": 10,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-6A52C659"
+  },
+  {
+    "name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "available": 54,
+    "lat": 5.575323,
+    "lng": -0.154237,
+    "trust_level": 3,
+    "owner_lat": "5.575323242857646",
+    "owner_lng": "-0.15423715156328766",
+    "vehicle_type": "bike",
+    "id": 11,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-E05F807D"
+  },
+  {
+    "name": "GOLD RUSH",
+    "price": 22.0,
+    "available": 13,
+    "lat": 5.575323,
+    "lng": -0.154237,
+    "trust_level": 1,
+    "owner_lat": "5.575323242857646",
+    "owner_lng": "-0.15423715156328766",
+    "vehicle_type": "bike",
+    "id": 12,
+    "distance": "0.5 km",
+    "gps_locked": true,
+    "qr_code_id": "PW-89D41866"
   }
 ]

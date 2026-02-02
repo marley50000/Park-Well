@@ -124,5 +124,77 @@
     "user_name": "Spark Marley",
     "vehicle_plate": "RTIOIll",
     "timestamp": 1769977003.7111251
+  },
+  {
+    "id": 1770031359007,
+    "spot_id": 6,
+    "spot_name": "Pamlwine (Bush Canteen)",
+    "price": 13.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1770031359.007301
+  },
+  {
+    "id": 1770033149312,
+    "spot_id": 7,
+    "spot_name": "Pamlwine (2)",
+    "price": 13.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1770033149.3125663
+  },
+  {
+    "id": 1770037573380,
+    "spot_id": 11,
+    "spot_name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "RTIOIll",
+    "timestamp": 1770037573.4484835
+  },
+  {
+    "id": 1770057286158,
+    "spot_id": 12,
+    "spot_name": "GOLD RUSH",
+    "price": 22.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "Gtyioo",
+    "timestamp": 1770057286.1581643
+  },
+  {
+    "id": 1770063095548,
+    "spot_id": 12,
+    "spot_name": "GOLD RUSH",
+    "price": 22.0,
+    "user_name": "F",
+    "vehicle_plate": "46SSF",
+    "timestamp": 1770063095.5484338
+  },
+  {
+    "id": 1770065109641,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "TYK",
+    "vehicle_plate": "GYJ",
+    "timestamp": 1770065109.641643
+  },
+  {
+    "id": 1770065321934,
+    "spot_id": 6,
+    "spot_name": "Pamlwine (Bush Canteen)",
+    "price": 13.0,
+    "user_name": "TYK",
+    "vehicle_plate": "GYJ",
+    "timestamp": 1770065321.9342175
+  },
+  {
+    "id": 1770065892946,
+    "spot_id": 4,
+    "spot_name": "Labadi Beach Parking",
+    "price": 8,
+    "user_name": "TYK",
+    "vehicle_plate": "GYJ",
+    "timestamp": 1770065892.946034
   }
 ]

@@ -226,7 +226,7 @@
 
     <script>
         // Format Timestamp
-        const ts = {{ txn.timestamp }};
+        const ts = "{{ txn.timestamp }}";
         const date = new Date(ts * 1000);
         document.getElementById('dateDisplay').innerText = date.toLocaleString();
     </script>

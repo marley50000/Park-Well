@@ -132,16 +132,23 @@ function renderList(spots) {
         item.innerHTML = `
             <div style="display: flex; gap: 1rem; align-items: center;">
                 <div style="width: 40px; height: 40px; background: rgba(99,102,241,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6366f1;">
-                    <ion-icon name="car-sport"></ion-icon>
+                    <ion-icon name="${getVehicleIcon(spot.vehicle_type)}"></ion-icon>
                 </div>
                 <div>
                     <h4 style="font-weight: 700;">${spot.name}</h4>
-                    <div style="color: #9ca3af; font-size: 0.875rem;">
-                        GH₵ ${spot.price}/hr • ${spot.available} spots
+                        <div style="font-size: 0.875rem; color: #9ca3af; display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+                            <span>GH₵ ${spot.price}/hr • ${spot.available} spots</span>
+                            ${getTrustBadge(spot.trust_level)}
+                            ${spot.vehicle_type === 'bike' ? '<span style="font-size: 0.7rem; background: #374151; padding: 1px 4px; border-radius: 4px;">Bike Only</span>' : ''}
+                            ${spot.vehicle_type === 'truck' ? '<span style="font-size: 0.7rem; background: #374151; padding: 1px 4px; border-radius: 4px;">Large</span>' : ''}
+                            ${spot.qr_code_id ? '<span title="Physical QR Active" style="color: #fbbf24; font-size: 0.8rem;"><ion-icon name="qr-code"></ion-icon></span>' : ''}
+                        </div>
                     </div>
-                </div>
             </div>
             <div style="display: flex; gap: 0.5rem;">
+                 <a href="/qrcode/${spot.id}" target="_blank" style="background: rgba(16,185,129,0.1); color: #10b981; border: none; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; text-decoration: none;">
+                    <ion-icon name="print"></ion-icon>
+                 </a>
                  <button onclick='openEditModal(${spot.id})' style="background: rgba(99,102,241,0.1); color: #6366f1; border: none; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
                     <ion-icon name="create"></ion-icon>
                 </button>
@@ -252,13 +259,92 @@ function initMap(elementId, latInputId, lngInputId, isEdit = false) {
         const { lat, lng } = marker.getLatLng();
         document.getElementById(latInputId).value = lat.toFixed(6);
         document.getElementById(lngInputId).value = lng.toFixed(6);
+
+        // Client-side Distance Warning for "Add Map"
+        if (elementId === 'addMap') {
+            const ownerLat = parseFloat(document.getElementById('ownerLat').value);
+            const ownerLng = parseFloat(document.getElementById('ownerLng').value);
+            if (!isNaN(ownerLat) && !isNaN(ownerLng)) {
+                const dist = haversine(lat, lng, ownerLat, ownerLng);
+                const statusEl = document.getElementById('gpsStatus');
+                if (dist > 100) {
+                    statusEl.innerHTML = `<span style="color: #ef4444; font-weight:700;">⛔ Too Far! (${Math.round(dist)}m) <br>Must be <100m from you.</span>`;
+                } else {
+                    statusEl.innerHTML = '<span style="color: #10b981;">Locked ✅ (Fine-tune pin if needed)</span>';
+                }
+            }
+        }
     });
 
     return { map: mapInstance, marker };
 }
 
+function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371e3;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
 
 // --- Global Handlers ---
+
+function getTrustBadge(level) {
+    if (level === 1) return '<span style="background: rgba(251, 191, 36, 0.2); color: #fbbf24; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(251, 191, 36, 0.3);">GOLD 🥇</span>';
+    if (level === 2) return '<span style="background: rgba(148, 163, 184, 0.2); color: #94a3b8; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(148, 163, 184, 0.3);">SILVER 🥈</span>';
+    return '<span style="background: rgba(180, 83, 9, 0.2); color: #b45309; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: 700; border: 1px solid rgba(180, 83, 9, 0.3);">BRONZE 🥉</span>';
+}
+
+function getVehicleIcon(type) {
+    if (type === 'bike') return 'bicycle';
+    if (type === 'truck') return 'bus'; // Closest generic for large vehicle
+    return 'car-sport';
+}
+
+window.captureLocation = () => {
+    const statusEl = document.getElementById('gpsStatus');
+    statusEl.innerHTML = '<ion-icon name="sync" class="spin"></ion-icon> Locating...';
+
+    if (!navigator.geolocation) {
+        statusEl.innerText = 'Geolocation not supported';
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition((pos) => {
+        const { latitude, longitude } = pos.coords;
+        document.getElementById('ownerLat').value = latitude;
+        document.getElementById('ownerLng').value = longitude;
+
+        // Also Auto-fill the spot lat/lng if empty
+        const latInput = document.getElementById('addLat');
+        const lngInput = document.getElementById('addLng');
+        if (!latInput.value) latInput.value = latitude.toFixed(6);
+        if (!lngInput.value) lngInput.value = longitude.toFixed(6);
+
+        statusEl.innerHTML = '<span style="color: #10b981;">Locked ✅</span>';
+
+        // Update Map Center
+        if (addMap && addMarker) {
+            addMap.setView([latitude, longitude], 18);
+            addMarker.setLatLng([latitude, longitude]);
+        }
+
+        statusEl.innerHTML = '<span style="color: #10b981;">Locked ✅ (Fine-tune pin if needed)</span>';
+
+    }, (err) => {
+
+    }, (err) => {
+        console.error(err);
+        statusEl.innerHTML = '<span style="color: #ef4444;">Failed to get location</span>';
+    });
+};
 
 window.openModal = () => {
     const modal = document.getElementById('addModal');
@@ -281,6 +367,15 @@ window.openModal = () => {
             addMarker.setLatLng([5.6037, -0.1870]);
         }, 100);
     }
+
+    // Enforce Security: Disable manual typing initially
+    document.getElementById('addLat').readOnly = true;
+    document.getElementById('addLng').readOnly = true;
+
+    // AUTO-CAPTURE ON OPEN
+    setTimeout(() => {
+        window.captureLocation();
+    }, 500);
 };
 
 window.closeModal = () => {
@@ -301,6 +396,10 @@ window.openEditModal = (spotId) => {
     document.getElementById('editAvailable').value = spot.available;
     document.getElementById('editLat').value = spot.lat;
     document.getElementById('editLng').value = spot.lng;
+
+    const trustSelect = document.getElementById('editTrustLevel');
+    if (trustSelect) trustSelect.value = spot.trust_level || 3;
+
     editModal.classList.remove('hidden');
 
     // Init or Update Map
@@ -394,7 +493,11 @@ function handleAddSubmit(e) {
         price: formData.get('price'),
         available: formData.get('available'),
         lat: formData.get('lat'),
-        lng: formData.get('lng')
+        lng: formData.get('lng'),
+        trust_level: formData.get('trust_level'),
+        owner_lat: formData.get('owner_lat'),
+        owner_lng: formData.get('owner_lng'),
+        vehicle_type: formData.get('vehicle_type')
     };
 
     fetch('/api/spots', {
@@ -402,8 +505,11 @@ function handleAddSubmit(e) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
     })
-        .then(r => {
-            if (!r.ok) throw new Error('Failed to add spot');
+        .then(async r => {
+            if (!r.ok) {
+                const res = await r.json();
+                throw new Error(res.message || 'Failed to add spot');
+            }
             return r.json();
         })
         .then(() => {
@@ -423,7 +529,11 @@ function handleEditSubmit(e) {
         price: formData.get('price'),
         available: formData.get('available'),
         lat: formData.get('lat'),
-        lng: formData.get('lng')
+        lng: formData.get('lng'),
+        lat: formData.get('lat'),
+        lng: formData.get('lng'),
+        trust_level: formData.get('trust_level'),
+        vehicle_type: formData.get('vehicle_type')
     };
 
     fetch(`/api/spots/${id}`, {

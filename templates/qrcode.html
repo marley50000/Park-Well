@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Print QR - {{ spot.name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
+    <style>
+        body {
+            background: #e5e7eb;
+            font-family: 'Space Grotesk', sans-serif;
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .print-card {
+            background: white;
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            border: 8px solid #000;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            color: #000;
+        }
+
+        .brand-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.05em;
+        }
+
+        .headline {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        .qr-container {
+            background: #000;
+            padding: 20px;
+            border-radius: 12px;
+            display: inline-block;
+            margin-bottom: 30px;
+        }
+
+        .qr-img {
+            display: block;
+            width: 250px;
+            height: 250px;
+            background: white;
+            /* Fallback */
+        }
+
+        .spot-name {
+            font-size: 1.25rem;
+            font-weight: 500;
+            color: #4b5563;
+            margin-bottom: 10px;
+            padding-bottom: 20px;
+            border-bottom: 2px dashed #e5e7eb;
+        }
+
+        .footer-text {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .trust-badge {
+            background: #fcd34d;
+            color: #000;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 16px;
+            border-radius: 99px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            border: 2px solid #000;
+        }
+
+        /* Action Buttons for Screen Only */
+        .screen-actions {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #111827;
+            padding: 10px 20px;
+            border-radius: 99px;
+            display: flex;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+            z-index: 100;
+        }
+
+        .action-btn {
+            background: white;
+            color: #111827;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 99px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: transform 0.2s;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+                display: block;
+            }
+
+            .print-card {
+                box-shadow: none;
+                border: 4px solid #000;
+                max-width: 100%;
+                width: 100%;
+                border-radius: 0;
+                position: absolute;
+                top: 0;
+                left: 0;
+                height: 100%;
+                box-sizing: border-box;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+            }
+
+            .screen-actions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="print-card">
+        <div class="brand-header">
+            <ion-icon name="car-sport" style="font-size: 24px;"></ion-icon>
+            <span class="brand-text">ParkWell.</span>
+        </div>
+
+        {% if spot.trust_level == 1 %}
+        <div class="trust-badge">
+            <ion-icon name="checkmark-circle"></ion-icon> Official Partner
+        </div>
+        {% elif spot.trust_level == 2 %}
+        <div class="trust-badge" style="background: #e5e7eb; border-color: #9ca3af; color: #374151;">
+            <ion-icon name="shield-checkmark"></ion-icon> Verified Community
+        </div>
+        {% else %}
+        <div class="trust-badge" style="background: white; border-color: #e5e7eb; color: #9ca3af; font-weight: 500;">
+            <ion-icon name="location"></ion-icon> Registered Spot
+        </div>
+        {% endif %}
+
+        <div class="headline">
+            Scan to<br>Find Parking Space
+        </div>
+
+        <div class="qr-container">
+            <!-- QR Code generating URL -->
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=400x400&data={{ request.host_url }}map?spot_id={{ spot.id }}"
+                alt="Scan QR" class="qr-img">
+        </div>
+
+        <div class="spot-name">
+            {{ spot.name }}
+        </div>
+
+        <div class="footer-text">
+            Powered by ParkWell • Secure GPS Parking
+        </div>
+    </div>
+
+    <div class="screen-actions">
+        <button onclick="window.print()" class="action-btn">
+            <ion-icon name="print"></ion-icon> Print Signage
+        </button>
+        <button onclick="window.close()" class="action-btn" style="background: #374151; color: white;">
+            Close
+        </button>
+    </div>
+
+</body>
+
+</html>

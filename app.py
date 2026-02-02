@@ -2,8 +2,10 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 import json
 import os
 import time
+import math
 from functools import wraps
 from flask_socketio import SocketIO, emit
+import uuid
 
 app = Flask(__name__)
 app.secret_key = 'parkwell_secret_key_ghana_living_legends' # Change in production
@@ -80,6 +82,16 @@ def dashboard():
 def get_spots():
     return jsonify(load_data())
 
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000  # Radius of Earth in meters
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
 @app.route('/api/spots', methods=['POST'])
 def add_spot():
     if 'admin' not in session:
@@ -87,12 +99,42 @@ def add_spot():
         
     data = load_data()
     new_spot = request.json
+    
+    # Inputs
+    try:
+        spot_lat = float(new_spot['lat'])
+        spot_lng = float(new_spot['lng'])
+    except:
+        return jsonify({'message': 'Invalid coordinates'}), 400
+
     new_spot['id'] = max([item['id'] for item in data] + [0]) + 1
-    new_spot['lat'] = float(new_spot['lat'])
-    new_spot['lng'] = float(new_spot['lng'])
+    new_spot['lat'] = spot_lat
+    new_spot['lng'] = spot_lng
     new_spot['price'] = float(new_spot['price'])
     new_spot['available'] = int(new_spot['available'])
-    new_spot['distance'] = "0.5 km" # Default mocked distance
+    new_spot['distance'] = "0.5 km" # Mocked for display
+    
+    # Trust Level
+    new_spot['trust_level'] = int(new_spot.get('trust_level', 3))
+    
+    # --- STRICT GPS SECURITY CHECK ---
+    owner_lat = new_spot.get('owner_lat')
+    owner_lng = new_spot.get('owner_lng')
+    
+    if not owner_lat or not owner_lng:
+        return jsonify({'message': 'SECURITY BLOCK: Physical presence required. Please use the "Capture My Location" button.'}), 400
+        
+    # Verify proximity (Allow 100m radius for GPS accuracy/drift)
+    distance = haversine(spot_lat, spot_lng, float(owner_lat), float(owner_lng))
+    
+    if distance > 100:
+        return jsonify({'message': f'LOCATION REJECTED: You are {int(distance)}m away from the spot. You must be physically on-site.'}), 400
+        
+    new_spot['gps_locked'] = True
+    # ---------------------------------
+    
+    # Generate Unique QR Code ID
+    new_spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
     
     data.append(new_spot)
     save_data(data)
@@ -117,6 +159,10 @@ def edit_spot(spot_id):
             spot['available'] = int(updated_info.get('available', spot['available']))
             spot['lat'] = float(updated_info.get('lat', spot['lat']))
             spot['lng'] = float(updated_info.get('lng', spot['lng']))
+            
+            if 'trust_level' in updated_info and updated_info['trust_level']:
+                 spot['trust_level'] = int(updated_info['trust_level'])
+            
             save_data(data)
             
             # Broadcast update
@@ -181,6 +227,23 @@ def view_receipt(txn_id):
     if not txn:
         return "Receipt not found", 404
     return render_template('receipt.html', txn=txn)
+
+@app.route('/qrcode/<int:spot_id>')
+def print_qr(spot_id):
+    if 'admin' not in session:
+        return redirect(url_for('login'))
+        
+    data = load_data()
+    spot = next((s for s in data if s['id'] == spot_id), None)
+    if not spot:
+        return "Spot not found", 404
+    
+    # Ensure QR ID exists for older data
+    if 'qr_code_id' not in spot:
+        spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
+        save_data(data)
+        
+    return render_template('qrcode.html', spot=spot)
 
 @app.route('/api/analytics', methods=['GET'])
 def get_analytics():

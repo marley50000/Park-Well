@@ -239,6 +239,12 @@ button {
     border-color: var(--color-primary);
 }
 
+.input-glass option {
+    background-color: #1f2937;
+    /* Dark Grey for dropdown options */
+    color: white;
+}
+
 .modal-overlay {
     position: fixed;
     inset: 0;
