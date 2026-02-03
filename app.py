@@ -14,48 +14,71 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 DATA_FILE = 'parking_data.json'
 TRANSACTIONS_FILE = 'transactions.json'
 
+# --- In-Memory Globals (For Vercel/Read-Only Support) ---
+# We load these once on startup. Writes update these globals + try to write to disk.
+try:
+    with open(DATA_FILE, 'r') as f:
+        MEM_DATA = json.load(f)
+except:
+    MEM_DATA = []
+
+try:
+    with open(TRANSACTIONS_FILE, 'r') as f:
+        MEM_TRANSACTIONS = json.load(f)
+except:
+    MEM_TRANSACTIONS = []
+
+try:
+    with open(SESSIONS_FILE, 'r') as f:
+        MEM_SESSIONS = json.load(f)
+except:
+    MEM_SESSIONS = []
+
 # --- Helpers ---
 def load_data():
-    if not os.path.exists(DATA_FILE):
-        return []
-    with open(DATA_FILE, 'r') as f:
-        return json.load(f)
+    return MEM_DATA
 
 def save_data(data):
-    with open(DATA_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    global MEM_DATA
+    MEM_DATA = data
+    try:
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
+    except OSError:
+        pass # Ignore read-only file system errors (Vercel)
 
 def load_transactions():
-    if not os.path.exists(TRANSACTIONS_FILE):
-        return []
-    with open(TRANSACTIONS_FILE, 'r') as f:
-        return json.load(f)
+    return MEM_TRANSACTIONS
 
 def save_transaction(transaction):
-    transactions = load_transactions()
-    transactions.append(transaction)
-    with open(TRANSACTIONS_FILE, 'w') as f:
-        json.dump(transactions, f, indent=2)
-
-SESSIONS_FILE = 'active_sessions.json'
+    global MEM_TRANSACTIONS
+    MEM_TRANSACTIONS.append(transaction)
+    try:
+        with open(TRANSACTIONS_FILE, 'w') as f:
+            json.dump(MEM_TRANSACTIONS, f, indent=2)
+    except OSError:
+        pass
 
 def load_sessions():
-    if not os.path.exists(SESSIONS_FILE):
-        return []
-    with open(SESSIONS_FILE, 'r') as f:
-        return json.load(f)
+    return MEM_SESSIONS
 
 def save_session(session_data):
-    sessions = load_sessions()
-    sessions.append(session_data)
-    with open(SESSIONS_FILE, 'w') as f:
-        json.dump(sessions, f, indent=2)
+    global MEM_SESSIONS
+    MEM_SESSIONS.append(session_data)
+    try:
+        with open(SESSIONS_FILE, 'w') as f:
+            json.dump(MEM_SESSIONS, f, indent=2)
+    except OSError:
+        pass
 
 def remove_session(spot_id):
-    sessions = load_sessions()
-    sessions = [s for s in sessions if s['spot_id'] != spot_id]
-    with open(SESSIONS_FILE, 'w') as f:
-        json.dump(sessions, f, indent=2)
+    global MEM_SESSIONS
+    MEM_SESSIONS = [s for s in MEM_SESSIONS if s['spot_id'] != spot_id]
+    try:
+        with open(SESSIONS_FILE, 'w') as f:
+            json.dump(MEM_SESSIONS, f, indent=2)
+    except OSError:
+        pass
 
 def login_required(f):
     @wraps(f)
