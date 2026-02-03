@@ -11,27 +11,31 @@ app = Flask(__name__)
 app.secret_key = 'parkwell_secret_key_ghana_living_legends' # Change in production
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-DATA_FILE = 'parking_data.json'
-TRANSACTIONS_FILE = 'transactions.json'
-
 # --- In-Memory Globals (For Vercel/Read-Only Support) ---
-# We load these once on startup. Writes update these globals + try to write to disk.
+MEM_DATA = []
+MEM_TRANSACTIONS = []
+MEM_SESSIONS = []
+
+# Try loading initial data, but don't fail if files missing
 try:
-    with open(DATA_FILE, 'r') as f:
-        MEM_DATA = json.load(f)
-except:
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, 'r') as f:
+            MEM_DATA = json.load(f)
+except Exception:
     MEM_DATA = []
 
 try:
-    with open(TRANSACTIONS_FILE, 'r') as f:
-        MEM_TRANSACTIONS = json.load(f)
-except:
+    if os.path.exists(TRANSACTIONS_FILE):
+        with open(TRANSACTIONS_FILE, 'r') as f:
+            MEM_TRANSACTIONS = json.load(f)
+except Exception:
     MEM_TRANSACTIONS = []
 
 try:
-    with open(SESSIONS_FILE, 'r') as f:
-        MEM_SESSIONS = json.load(f)
-except:
+    if os.path.exists(SESSIONS_FILE):
+        with open(SESSIONS_FILE, 'r') as f:
+            MEM_SESSIONS = json.load(f)
+except Exception:
     MEM_SESSIONS = []
 
 # --- Helpers ---
@@ -44,8 +48,8 @@ def save_data(data):
     try:
         with open(DATA_FILE, 'w') as f:
             json.dump(data, f, indent=2)
-    except OSError:
-        pass # Ignore read-only file system errors (Vercel)
+    except Exception:
+        pass # Silently fail on read-only systems
 
 def load_transactions():
     return MEM_TRANSACTIONS
@@ -56,7 +60,7 @@ def save_transaction(transaction):
     try:
         with open(TRANSACTIONS_FILE, 'w') as f:
             json.dump(MEM_TRANSACTIONS, f, indent=2)
-    except OSError:
+    except Exception:
         pass
 
 def load_sessions():
@@ -68,7 +72,7 @@ def save_session(session_data):
     try:
         with open(SESSIONS_FILE, 'w') as f:
             json.dump(MEM_SESSIONS, f, indent=2)
-    except OSError:
+    except Exception:
         pass
 
 def remove_session(spot_id):
@@ -77,7 +81,7 @@ def remove_session(spot_id):
     try:
         with open(SESSIONS_FILE, 'w') as f:
             json.dump(MEM_SESSIONS, f, indent=2)
-    except OSError:
+    except Exception:
         pass
 
 def login_required(f):
@@ -88,8 +92,31 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# --- Safe SocketIO Wrapper ---
+class SafeSocketIO:
+    def __init__(self, app):
+        self.sock = SocketIO(app, cors_allowed_origins="*", async_mode='threading') # Force threading for compatibility
+    
+    def emit(self, event, data):
+        try:
+            self.sock.emit(event, data)
+        except Exception:
+            pass # Ignore socket errors in serverless
+
+    def run(self, app, **kwargs):
+        self.sock.run(app, **kwargs)
+
+# Initialize Safe Socket
+safe_socket = SafeSocketIO(app)
+
+# Replace direct socketio usages in routes with safe_socket
+# Note: We need to update the routes below to use `safe_socket.emit` instead of `socketio.emit`
+
 # --- Routes ---
-# ... (Keep existing routes same until API) ...
+# ... (Keep existing routes - NO CHANGE NEEDED TO ROUTES IF WE REDEFINE socketio variable) ...
+# Actually, the easiest way is to rename the variable 'socketio' to the safe wrapper
+socketio = safe_socket 
+
 @app.route('/')
 def home():
     return render_template('welcome.html')
@@ -170,6 +197,7 @@ def add_spot():
     # Generate Unique QR Code ID
     new_spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
     
+    # Append to memory
     data.append(new_spot)
     save_data(data)
     
