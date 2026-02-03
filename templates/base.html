@@ -38,9 +38,11 @@
             background: #030712;
         }
 
-        /* .leaflet-tile {
-            filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-        } */
+        .leaflet-layer .leaflet-tile-container img.leaflet-tile {
+            /* Midnight Monochrome Match */
+            filter: grayscale(100%) invert(100%) contrast(110%) brightness(85%) !important;
+            -webkit-filter: grayscale(100%) invert(100%) contrast(110%) brightness(85%) !important;
+        }
     </style>
 </head>
 

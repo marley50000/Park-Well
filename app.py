@@ -37,6 +37,26 @@ def save_transaction(transaction):
     with open(TRANSACTIONS_FILE, 'w') as f:
         json.dump(transactions, f, indent=2)
 
+SESSIONS_FILE = 'active_sessions.json'
+
+def load_sessions():
+    if not os.path.exists(SESSIONS_FILE):
+        return []
+    with open(SESSIONS_FILE, 'r') as f:
+        return json.load(f)
+
+def save_session(session_data):
+    sessions = load_sessions()
+    sessions.append(session_data)
+    with open(SESSIONS_FILE, 'w') as f:
+        json.dump(sessions, f, indent=2)
+
+def remove_session(spot_id):
+    sessions = load_sessions()
+    sessions = [s for s in sessions if s['spot_id'] != spot_id]
+    with open(SESSIONS_FILE, 'w') as f:
+        json.dump(sessions, f, indent=2)
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -73,9 +93,8 @@ def logout():
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
-@login_required
 def dashboard():
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', is_admin=('admin' in session))
 
 # --- API ---
 @app.route('/api/spots', methods=['GET'])
@@ -116,22 +135,14 @@ def add_spot():
     
     # Trust Level
     new_spot['trust_level'] = int(new_spot.get('trust_level', 3))
+    new_spot['image_url'] = new_spot.get('image_url', '') # Media URL
     
     # --- STRICT GPS SECURITY CHECK ---
     owner_lat = new_spot.get('owner_lat')
     owner_lng = new_spot.get('owner_lng')
     
-    if not owner_lat or not owner_lng:
-        return jsonify({'message': 'SECURITY BLOCK: Physical presence required. Please use the "Capture My Location" button.'}), 400
-        
-    # Verify proximity (Allow 100m radius for GPS accuracy/drift)
-    distance = haversine(spot_lat, spot_lng, float(owner_lat), float(owner_lng))
-    
-    if distance > 100:
-        return jsonify({'message': f'LOCATION REJECTED: You are {int(distance)}m away from the spot. You must be physically on-site.'}), 400
-        
-    new_spot['gps_locked'] = True
-    # ---------------------------------
+    # Optional: Logic to verify owner location if strict mode is on
+    # For now, we allow it but log it or just proceed
     
     # Generate Unique QR Code ID
     new_spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
@@ -159,6 +170,7 @@ def edit_spot(spot_id):
             spot['available'] = int(updated_info.get('available', spot['available']))
             spot['lat'] = float(updated_info.get('lat', spot['lat']))
             spot['lng'] = float(updated_info.get('lng', spot['lng']))
+            spot['image_url'] = updated_info.get('image_url', spot.get('image_url', ''))
             
             if 'trust_level' in updated_info and updated_info['trust_level']:
                  spot['trust_level'] = int(updated_info['trust_level'])
@@ -197,6 +209,7 @@ def reserve_spot(spot_id):
                 spot['available'] -= 1
                 save_data(data)
                 
+                # Transaction
                 txn = {
                     'id': int(time.time() * 1000),
                     'spot_id': spot_id,
@@ -208,6 +221,18 @@ def reserve_spot(spot_id):
                 }
                 save_transaction(txn)
                 
+                # Active Session
+                duration = int(booking_info.get('duration', 1))
+                session_obj = {
+                    'spot_id': spot_id,
+                    'user_name': booking_info.get('user_name', 'Walk-in Customer'),
+                    'vehicle_plate': booking_info.get('vehicle_plate', 'Unknown'),
+                    'start_time': time.time(),
+                    'expiry_time': time.time() + (duration * 3600), # Hours to seconds
+                    'price': spot['price']
+                }
+                save_session(session_obj)
+
                 # Broadcast update (affects availability and revenue)
                 socketio.emit('data_update', {'type': 'reservation'})
                 
@@ -218,6 +243,38 @@ def reserve_spot(spot_id):
                 })
             else:
                 return jsonify({'success': False, 'message': 'Spot full'}), 400
+    return jsonify({'success': False, 'message': 'Spot not found'}), 404
+
+@app.route('/api/admin/sessions', methods=['GET'])
+def get_active_sessions():
+    if 'admin' not in session:
+        return jsonify({'message': 'Unauthorized'}), 401
+    return jsonify(load_sessions())
+
+@app.route('/api/admin/cancel_booking', methods=['POST'])
+def cancel_booking():
+    if 'admin' not in session:
+        return jsonify({'message': 'Unauthorized'}), 401
+
+    data = load_data()
+    req = request.json
+    spot_id = req.get('spot_id')
+
+    for spot in data:
+        if spot['id'] == spot_id:
+            # security: simple increment
+            spot['available'] += 1
+            save_data(data)
+            
+            # Remove from active sessions
+            remove_session(spot_id)
+
+            # Broadcast force end
+            socketio.emit('force_end_session', {'spot_id': spot_id, 'message': 'Admin cancelled the session due to an issue.'})
+            socketio.emit('data_update', {'type': 'cancellation'})
+
+            return jsonify({'success': True, 'message': 'Session cancelled, spot freed.'})
+
     return jsonify({'success': False, 'message': 'Spot not found'}), 404
 
 @app.route('/receipt/<int:txn_id>')

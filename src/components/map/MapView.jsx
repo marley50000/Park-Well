@@ -14,26 +14,32 @@ L.Icon.Default.mergeOptions({
     shadowUrl: markerShadow,
 });
 
-const DARK_MAP_URL = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+// Google Maps Tiles (Standard) - Optimized with subdomains
+const MAP_URL = 'https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
+const SUBDOMAINS = ['mt0', 'mt1', 'mt2', 'mt3'];
+const ATTRIBUTION = '&copy; <a href="https://www.google.com/maps">Google Maps</a>';
 
 const MapView = ({ spots = [] }) => {
     return (
         <div style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}>
-            {/* Gradients */}
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '8rem', background: 'linear-gradient(to bottom, #030712 0%, rgba(3,7,18,0.6) 100%)', pointerEvents: 'none', zIndex: 400 }}></div>
-            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '8rem', background: 'linear-gradient(to top, #030712 0%, rgba(3,7,18,0.6) 100%)', pointerEvents: 'none', zIndex: 400 }}></div>
+            {/* Gradients - Cinematic Black */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '12rem', background: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', zIndex: 400 }}></div>
+            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '12rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%)', pointerEvents: 'none', zIndex: 400 }}></div>
 
             <MapContainer
                 center={[40.7128, -74.0060]}
-                zoom={14}
+                zoom={15}
                 scrollWheelZoom={true}
                 zoomControl={false}
                 style={{ width: '100%', height: '100%', background: '#030712', outline: 'none' }}
             >
                 <TileLayer
                     attribution={ATTRIBUTION}
-                    url={DARK_MAP_URL}
+                    url={MAP_URL}
+                    subdomains={SUBDOMAINS}
+                    maxZoom={20}
+                    keepBuffer={4}
+                    updateWhenZooming={false}
                 />
                 <ZoomControl position="bottomright" />
 

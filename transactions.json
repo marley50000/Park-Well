@@ -196,5 +196,140 @@
     "user_name": "TYK",
     "vehicle_plate": "GYJ",
     "timestamp": 1770065892.946034
+  },
+  {
+    "id": 1770130212560,
+    "spot_id": 6,
+    "spot_name": "Pamlwine (Bush Canteen)",
+    "price": 13.0,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "Gtyioo",
+    "timestamp": 1770130212.5605195
+  },
+  {
+    "id": 1770132457923,
+    "spot_id": 6,
+    "spot_name": "Pamlwine (Bush Canteen)",
+    "price": 13.0,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "Gtyioo",
+    "timestamp": 1770132457.9236174
+  },
+  {
+    "id": 1770132594863,
+    "spot_id": 5,
+    "spot_name": "Makola Market Safe Park",
+    "price": 5,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "Gtyioo",
+    "timestamp": 1770132594.8634937
+  },
+  {
+    "id": 1770134584395,
+    "spot_id": 11,
+    "spot_name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "Gtyioo",
+    "timestamp": 1770134584.3953688
+  },
+  {
+    "id": 1770135662377,
+    "spot_id": 11,
+    "spot_name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "QEQ-qeQEQ",
+    "timestamp": 1770135662.377633
+  },
+  {
+    "id": 1770135680138,
+    "spot_id": 11,
+    "spot_name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "user_name": "T6YYI67",
+    "vehicle_plate": "QEQ-qeQEQ",
+    "timestamp": 1770135680.1383348
+  },
+  {
+    "id": 1770135727313,
+    "spot_id": 11,
+    "spot_name": "Pamlwine 3AA)",
+    "price": 10.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "QEQ-qeQEQ",
+    "timestamp": 1770135727.3133674
+  },
+  {
+    "id": 1770135779955,
+    "spot_id": 9,
+    "spot_name": "Pamlwine 4)",
+    "price": 13.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770135779.955042
+  },
+  {
+    "id": 1770136807686,
+    "spot_id": 13,
+    "spot_name": "Bicycle Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770136807.6865537
+  },
+  {
+    "id": 1770136817665,
+    "spot_id": 12,
+    "spot_name": "New Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770136817.665861
+  },
+  {
+    "id": 1770142510844,
+    "spot_id": 12,
+    "spot_name": "New Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770142510.84436
+  },
+  {
+    "id": 1770143448341,
+    "spot_id": 13,
+    "spot_name": "Bicycle Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770143448.3411539
+  },
+  {
+    "id": 1770143484108,
+    "spot_id": 12,
+    "spot_name": "New Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770143484.1084182
+  },
+  {
+    "id": 1770143602632,
+    "spot_id": 14,
+    "spot_name": "Era Space",
+    "price": 45.0,
+    "user_name": "WE",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770143602.6327012
+  },
+  {
+    "id": 1770143804597,
+    "spot_id": 14,
+    "spot_name": "Era Space",
+    "price": 45.0,
+    "user_name": "y8i",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770143804.597888
   }
 ]

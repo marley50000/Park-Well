@@ -25,23 +25,46 @@
                 style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; cursor: pointer;">
                 <ion-icon name="car"></ion-icon> My Vehicles
             </div>
+
+            {% if is_admin %}
+            <!-- Admin Tab -->
+            <div id="nav-admin" class="nav-item" onclick="switchUserTab('admin')"
+                style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #f59e0b; font-weight: 500; align-items: center; cursor: pointer; border: 1px dashed rgba(245, 158, 11, 0.3);">
+                <ion-icon name="shield-half"></ion-icon> Admin Control
+            </div>
+            {% endif %}
+
             <a href="/map"
                 style="margin-top: auto; display: flex; gap: 0.75rem; padding: 0.75rem; color: #10b981; font-weight: 600; align-items: center; text-decoration: none; border: 1px solid #10b981; border-radius: 8px; justify-content: center;">
                 <ion-icon name="map"></ion-icon> Find Parking
             </a>
+
+            {% if is_admin %}
+            <a href="/logout"
+                style="margin-top: 1rem; display: flex; gap: 0.75rem; padding: 0.75rem; color: #ef4444; font-weight: 500; align-items: center; text-decoration: none;">
+                <ion-icon name="log-out"></ion-icon> Logout Admin
+            </a>
+            {% else %}
             <a href="/"
                 style="margin-top: 1rem; display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; text-decoration: none;">
                 <ion-icon name="log-out"></ion-icon> Back Home
             </a>
+            {% endif %}
         </div>
     </div>
 
     <!-- Main Content -->
     <div class="db-content">
         <header class="db-header">
-            <h1 style="font-size: 1.5rem; font-weight: 700;">Driver Dashboard</h1>
+            <h1 style="font-size: 1.5rem; font-weight: 700;">Dashboard</h1>
             <div style="display: flex; align-items: center; gap: 1rem;">
+                <!-- Login Check Logic for Display -->
+                {% if is_admin %}
+                <span style="color: #f59e0b; font-weight: 600;">Admin Mode Active</span>
+                {% else %}
                 <span style="color: #9ca3af;">Welcome, Driver</span>
+                {% endif %}
+
                 <div
                     style="width: 40px; height: 40px; background: #374151; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
                     <ion-icon name="person" style="color: white;"></ion-icon>
@@ -129,6 +152,34 @@
             </div>
 
         </div>
+
+        <!-- Admin Section (Hidden by default, shown via Tab) -->
+        <div id="admin-section" class="hidden">
+            <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem;">Manage Spots & Sessions</h3>
+            <div class="glass-card" style="padding: 0;">
+                <div
+                    style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center;">
+
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="color: #9ca3af;">Active Spots</span>
+                        <button onclick="fetchAdminSpots()"
+                            style="background: none; border: 1px solid rgba(255,255,255,0.2); color: white; padding: 4px 10px; border-radius: 6px; cursor: pointer;">
+                            <ion-icon name="refresh"></ion-icon>
+                        </button>
+                    </div>
+
+                    <button onclick="openAddSpotModal()"
+                        style="background: #6366f1; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        + Add New Spot
+                    </button>
+                </div>
+                <div id="adminSpotsList" style="display: flex; flex-direction: column;">
+                    <!-- JS Rendered -->
+                    <div style="padding: 2rem; text-align: center; color: #9ca3af;">Loading spots...</div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -165,6 +216,81 @@
     </div>
 </div>
 
+<!-- Add/Edit Spot Modal (ADMIN) -->
+<div id="spotModal" class="modal-overlay hidden">
+    <div class="glass-card" style="width: 100%; max-width: 400px; background: #030712; border: 1px solid #374151;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem;">
+            <h3 id="modalTitle" style="font-weight: 700; font-size: 1.25rem;">Manage Spot</h3>
+            <button onclick="closeSpotModal()" style="background: none; border: none; color: white; cursor: pointer;">
+                <ion-icon name="close" style="font-size: 1.5rem;"></ion-icon>
+            </button>
+        </div>
+
+        <form id="spotForm" onsubmit="handleSpotSubmit(event)"
+            style="display: flex; flex-direction: column; gap: 1rem;">
+            <input type="hidden" id="spotId">
+
+            <div>
+                <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Spot
+                    Name</label>
+                <input type="text" id="spotName" class="input-glass" placeholder="e.g. Garage A - Slot 5" required
+                    style="width: 100%;">
+            </div>
+
+            <!-- Map Container for Pinning -->
+            <div>
+                <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Pin
+                    Location</label>
+                <div id="adminMap"
+                    style="height: 250px; width: 100%; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">
+                </div>
+                <div style="font-size: 0.75rem; color: #6366f1;">* Click map to set pin</div>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <div style="flex: 1;">
+                    <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Price
+                        (GHS/hr)</label>
+                    <input type="number" id="spotPrice" class="input-glass" placeholder="5.00" step="0.5" required
+                        style="width: 100%;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Available
+                        Spaces</label>
+                    <input type="number" id="spotAvailable" class="input-glass" placeholder="1" required
+                        style="width: 100%;">
+                </div>
+            </div>
+
+            <div>
+                <label
+                    style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Coordinates</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="spotLat" class="input-glass" placeholder="Lat" required style="width: 100%;">
+                    <input type="text" id="spotLng" class="input-glass" placeholder="Lng" required style="width: 100%;">
+                </div>
+                <!-- Media -->
+                <div style="margin-top: 1rem;">
+                    <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Spot Image
+                        URL (Optional)</label>
+                    <input type="text" id="spotImage" class="input-glass" placeholder="https://..."
+                        style="width: 100%;">
+                </div>
+
+                <!-- Optional: Keep auto-locate button as fallback -->
+                <button type="button" id="btnGetLocation" onclick="getCurrentLocation()"
+                    style="margin-top: 1rem; width: 100%; background: #374151; color: white; border: none; padding: 10px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <ion-icon name="location"></ion-icon> Capture Current Location
+                </button>
+            </div>
+
+            <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">
+                Save Spot
+            </button>
+        </form>
+    </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // --- USER DASHBOARD LOGIC ---
@@ -175,6 +301,12 @@
         renderVehicleList();
         updateStatusDisplay();
         renderTransactionList();
+
+        // Auto-load admin spots if tab is somehow active or for preload
+        // fetchAdminSpots(); // Only fetch if admin tab is active to save resources? 
+        // For now, let's just leave it lazy loaded on tab switch.
+
+        // Check URL or storage to allow persisting tab state?
     });
 
     function updateWalletDisplay() {
@@ -332,6 +464,297 @@
     function switchUserTab(tab) {
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         document.getElementById('nav-' + tab).classList.add('active');
+
+        if (tab === 'admin') {
+            document.getElementById('user-overview-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.remove('hidden');
+            fetchAdminSpots();
+        } else if (tab === 'overview') {
+            document.getElementById('user-overview-section').classList.remove('hidden');
+            document.getElementById('admin-section').classList.add('hidden');
+        } else {
+            // For other tabs not implemented fully in this snippet
+            document.getElementById('user-overview-section').classList.add('hidden');
+            document.getElementById('admin-section').classList.add('hidden');
+        }
+    }
+
+    // --- ADMIN LOGIC ---
+    function fetchAdminSpots() {
+        console.log("Fetching admin spots & sessions");
+
+        Promise.all([
+            fetch('/api/spots').then(r => r.json()),
+            fetch('/api/admin/sessions').then(r => r.json())
+        ]).then(([spots, sessions]) => {
+            const list = document.getElementById('adminSpotsList');
+            if (spots.length === 0) {
+                list.innerHTML = '<div style="padding: 1rem; color: #9ca3af; text-align: center;">No spots found.</div>';
+                return;
+            }
+
+            const now = Date.now() / 1000; // Seconds
+
+            list.innerHTML = spots.map(s => {
+                // Find active session for this spot
+                // Note: simplified logic assuming 1 session per spot for now, though data model allows array.
+                // We grab the most recent session for this spot if available.
+                const session = sessions.find(sess => sess.spot_id == s.id);
+
+                let statusHtml = '';
+                let overtimeHtml = '';
+
+                if (session) {
+                    const timeLeft = session.expiry_time - now;
+                    const isOvertime = timeLeft < 0;
+
+                    if (isOvertime) {
+                        const overdueMins = Math.floor(Math.abs(timeLeft) / 60);
+                        const penalty = (overdueMins / 60) * s.price * 2; // Double rate penalty logic
+
+                        overtimeHtml = `
+                        <div style="margin-top: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 6px; padding: 0.75rem;">
+                            <div style="color: #ef4444; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                                <ion-icon name="warning"></ion-icon> OVERTIME ACTIVE
+                            </div>
+                            <div style="font-size: 0.75rem; color: #fca5a5; margin-top: 4px;">FINE ACCRUING</div>
+                            <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; align-items: flex-end;">
+                                <div style="font-weight: 700; color: white;">+${overdueMins}m overdue</div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 0.7rem; color: #9ca3af;">Current Penalty</div>
+                                    <div style="font-weight: 700; color: #fbbf24;">GH₵ ${penalty.toFixed(1)}</div>
+                                </div>
+                            </div>
+                        </div>`;
+
+                        statusHtml = `<span style="color: #ef4444; font-weight: 700;">Occupied (Overtime)</span>`;
+                    } else {
+                        const minsLeft = Math.floor(timeLeft / 60);
+                        statusHtml = `<span style="color: #f59e0b; font-weight: 700;">Occupied (${minsLeft}m left)</span>`;
+                    }
+                } else {
+                    statusHtml = `<span style="color: ${s.available > 0 ? '#10b981' : '#ef4444'}">${s.available} spaces</span>`;
+                }
+
+                return `
+                <div style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <div style="font-weight: 700; color: white; font-size: 1.1rem;">${s.name}</div>
+                            <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 4px;">
+                                ${statusHtml} 
+                                • GH₵ ${s.price}/hr
+                            </div>
+                            ${session ? `<div style="font-size: 0.8rem; color: #9ca3af; margin-top: 2px;">Plate: <span style="font-family: monospace; color: white;">${session.vehicle_plate}</span></div>` : ''}
+                        </div>
+                        <!-- Emergency Cancel -->
+                        <button onclick="adminCancelSession(${s.id})" title="Force Cancel Session"
+                            style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
+                            Force Cancel
+                        </button>
+                    </div>
+                    
+                    ${overtimeHtml}
+                    
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: ${overtimeHtml ? '0.5rem' : '0'};">
+                        <!-- Edit -->
+                        <!-- Edit -->
+                        <button onclick='openEditSpotModal(${JSON.stringify(s).replace(/'/g, "&#39;")})' 
+                            style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                            <ion-icon name="create"></ion-icon> Edit
+                        </button>
+                        
+                        <!-- QR Code -->
+                        <a href="/qrcode/${s.id}" target="_blank"
+                            style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; text-decoration: none;">
+                            <ion-icon name="qr-code"></ion-icon> Print QR
+                        </a>
+
+                        <!-- Delete -->
+                        <button onclick="deleteSpot(${s.id})" 
+                            style="background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                            <ion-icon name="trash"></ion-icon> Delete
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        });
+    }
+
+    function adminCancelSession(spotId) {
+        if (!confirm("Are you sure? This will:\n1. Increase spot availability (+1)\n2. Force stop the user's session timer\n3. Notify the user")) return;
+
+        fetch('/api/admin/cancel_booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ spot_id: spotId })
+        })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    alert("✅ Success: " + res.message);
+                    fetchAdminSpots();
+                } else {
+                    alert("Error: " + res.message);
+                }
+            })
+            .catch(err => alert("System Error"));
+    }
+
+    // --- SPOT MANAGEMENT (Add/Edit/Delete) with MAP ---
+
+    let adminMap = null;
+    let adminMarker = null;
+
+    function initAdminMap(lat, lng) {
+        // Default to Accra if no coords
+        const defaultLat = 5.6037;
+        const defaultLng = -0.1870;
+
+        const center = (lat && lng) ? [lat, lng] : [defaultLat, defaultLng];
+        const zoom = (lat && lng) ? 16 : 13;
+
+        if (!adminMap) {
+            adminMap = L.map('adminMap', { zoomControl: false }).setView(center, zoom);
+
+            L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                maxZoom: 20,
+                attribution: 'Google Maps'
+            }).addTo(adminMap);
+
+            // Click to Pin
+            adminMap.on('click', function (e) {
+                updateAdminMarker(e.latlng.lat, e.latlng.lng);
+            });
+        } else {
+            adminMap.setView(center, zoom);
+            setTimeout(() => adminMap.invalidateSize(), 300); // Fix rendering issues
+        }
+
+        if (lat && lng) {
+            updateAdminMarker(lat, lng);
+        } else if (adminMarker) {
+            adminMap.removeLayer(adminMarker);
+            adminMarker = null;
+        }
+    }
+
+    function updateAdminMarker(lat, lng) {
+        if (adminMarker) {
+            adminMarker.setLatLng([lat, lng]);
+        } else {
+            adminMarker = L.marker([lat, lng], { draggable: true }).addTo(adminMap);
+            // Drag Listener
+            adminMarker.on('dragend', function (e) {
+                const pos = e.target.getLatLng();
+                document.getElementById('spotLat').value = pos.lat.toFixed(6);
+                document.getElementById('spotLng').value = pos.lng.toFixed(6);
+            });
+        }
+
+        // Update Inputs
+        document.getElementById('spotLat').value = lat.toFixed(6);
+        document.getElementById('spotLng').value = lng.toFixed(6);
+    }
+
+    function openAddSpotModal() {
+        document.getElementById('modalTitle').innerText = 'Add New Spot';
+        document.getElementById('spotForm').reset();
+        document.getElementById('spotId').value = '';
+        document.getElementById('spotModal').classList.remove('hidden');
+
+        // Initialize Map
+        // Try getting location, else default
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => initAdminMap(pos.coords.latitude, pos.coords.longitude),
+                () => initAdminMap()
+            );
+        } else {
+            initAdminMap();
+        }
+    }
+
+    function openEditSpotModal(spot) {
+        document.getElementById('modalTitle').innerText = 'Edit Spot';
+        document.getElementById('spotId').value = spot.id;
+        document.getElementById('spotName').value = spot.name;
+        document.getElementById('spotPrice').value = spot.price;
+        document.getElementById('spotAvailable').value = spot.available;
+        document.getElementById('spotLat').value = spot.lat;
+        document.getElementById('spotLng').value = spot.lng;
+        // Check if element exists before setting value to avoid error if I haven't added the input yet
+        const imgInput = document.getElementById('spotImage');
+        if (imgInput) imgInput.value = spot.image_url || '';
+
+        document.getElementById('spotModal').classList.remove('hidden');
+
+        initAdminMap(spot.lat, spot.lng);
+    }
+
+    function closeSpotModal() {
+        document.getElementById('spotModal').classList.add('hidden');
+    }
+
+    function getCurrentLocation() {
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser");
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                // Update Inputs & Map
+                updateAdminMarker(lat, lng);
+                if (adminMap) adminMap.setView([lat, lng], 16);
+                alert("Location Captured");
+            },
+            () => { alert("Unable to retrieve your location"); }
+        );
+    }
+
+    function handleSpotSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById('spotId').value;
+        const data = {
+            name: document.getElementById('spotName').value,
+            price: document.getElementById('spotPrice').value,
+            available: document.getElementById('spotAvailable').value,
+            lat: document.getElementById('spotLat').value,
+            lng: document.getElementById('spotLng').value,
+            image_url: document.getElementById('spotImage').value,
+            // For security check logic (mocking physical presence if creating new)
+            owner_lat: document.getElementById('spotLat').value,
+            owner_lng: document.getElementById('spotLng').value
+        };
+
+        const method = id ? 'PUT' : 'POST';
+        const url = id ? `/api/spots/${id}` : '/api/spots';
+
+        fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+            .then(r => r.json())
+            .then(res => {
+                if (res.message && !res.id && !res.success) { // Error
+                    alert(res.message);
+                } else {
+                    closeSpotModal();
+                    fetchAdminSpots();
+                }
+            })
+            .catch(err => alert("Error saving spot"));
+    }
+
+    function deleteSpot(id) {
+        if (!confirm("Delete this spot permanently?")) return;
+        fetch(`/api/spots/${id}`, { method: 'DELETE' })
+            .then(() => fetchAdminSpots());
     }
 
 </script>

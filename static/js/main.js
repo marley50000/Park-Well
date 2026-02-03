@@ -3,8 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const DEFAULT_CENTER = [5.6037, -0.1870];
     let map = L.map('map', { zoomControl: false }).setView(DEFAULT_CENTER, 13);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    // Google Maps Tiles (Standard)
+    L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: '&copy; <a href="https://www.google.com/maps">Google Maps</a>',
+        maxZoom: 20,
+        keepBuffer: 4,               // Keep more tiles in memory to reduce reloading
+        updateWhenZooming: false,    // Wait until zoom finishes to load new tiles (prevents flickering)
+        updateInterval: 100          // Delay tile update slightly to bundle requests
     }).addTo(map);
 
     let allSpots = [];
@@ -103,6 +109,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 allSpots = spots;
                 renderSpots(spots);
 
+                // AUTO-ROUTING LOGIC
+                if (userLocation && !window.hasAutoRouted && spots.length > 0) {
+                    window.hasAutoRouted = true;
+                    const nearest = spots.find(s => s.available > 0);
+                    if (nearest) {
+                        // Show visible notification or just center
+                        // Let's create a non-intrusive toast
+                        const toast = document.createElement('div');
+                        toast.innerHTML = `
+                            <div style="background: #10b981; color: white; padding: 12px 16px; border-radius: 8px; font-weight: 600; font-family: 'Inter', sans-serif; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;">
+                                <ion-icon name="location"></ion-icon>
+                                Nearest Spot Found: ${nearest.name}
+                            </div>
+                        `;
+                        toast.style.cssText = "position: absolute; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; animation: slideDown 0.5s ease-out;";
+                        document.body.appendChild(toast);
+
+                        // Auto-center and open popup
+                        setTimeout(() => {
+                            map.setView([nearest.lat, nearest.lng], 16);
+                            if (markers[nearest.id]) markers[nearest.id].openPopup();
+                            // Optional: Highlight card?
+                            toast.remove();
+                        }, 2500);
+                    }
+                }
+
                 // Check for Deep Link (QR Code Scan)
                 const urlParams = new URLSearchParams(window.location.search);
                 const deepLinkSpotId = urlParams.get('spot_id');
@@ -183,10 +216,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const displayName = isBookedByUser ? spot.name : `<span style="font-style:italic; opacity:0.8;">🔒 Protected Zone</span>`;
 
             // Popup Content
+            // Popup Content
             marker.bindPopup(`
-                <div style="color: black; text-align: left; min-width: 200px; font-family: 'Inter', sans-serif;">
+                <div style="color: black; text-align: left; min-width: 220px; font-family: 'Inter', sans-serif; overflow: hidden; border-radius: 8px;">
+                    
+                    ${spot.image_url ? `
+                    <div style="height: 100px; margin: -14px -20px 12px -20px; position: relative;">
+                         <img src="${spot.image_url}" style="width: 100%; height: 100%; object-fit: cover;">
+                         <div style="position: absolute; bottom: 0; left: 0; width: 100%; height: 40px; background: linear-gradient(to top, white, transparent);"></div>
+                    </div>
+                    ` : ''}
+
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <div style="font-weight: 800; font-size: 1.1rem;">${displayName}</div>
+                        <div style="font-weight: 800; font-size: 1.1rem; line-height: 1.2;">${displayName}</div>
                         <div style="background: ${isBookedByUser ? '#d1fae5' : '#f3f4f6'}; color: ${isBookedByUser ? '#065f46' : '#6b7280'}; font-size: 0.7rem; font-weight: 700; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">
                             ${isBookedByUser ? 'UNLOCKED' : 'HIDDEN'}
                         </div>
@@ -235,41 +277,87 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Create Card
+            // Create Card
             const card = document.createElement('div');
-            card.className = 'spot-card';
-            card.innerHTML = `
-                <div class="glass-card" style="padding: 12px; display: flex; align-items: center; gap: 12px; border-left: 3px solid ${cardColor};">
-                    
-                    <!-- Icon Box -->
-                    <div style="width: 44px; height: 44px; background: rgba(255,255,255,0.05); border-radius: 10px; display: flex; align-items: center; justify-content: center; color: ${cardColor}; flex-shrink: 0;">
-                        <ion-icon name="${cardIcon}" style="font-size: 1.5rem;"></ion-icon>
-                    </div>
+            card.className = 'spot-card-item'; // New wrapper class
 
-                    <!-- Info -->
-                    <div style="flex-grow: 1; min-width: 0;">
-                        <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                            <h3 style="font-weight: 700; font-size: 1rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${displayName}</h3>
-                            ${getTrustBadgeHTML(spot.trust_level)}
+            // Availability
+            let availabilityColor = '#10b981';
+            let availabilityText = 'Available';
+            if (spot.available === 0) {
+                availabilityColor = '#ef4444';
+                availabilityText = 'Full';
+            } else if (spot.available < 3) {
+                availabilityColor = '#f59e0b';
+                availabilityText = 'Limited';
+            }
+
+            // Default Placeholder if no image (Abstract Tech Parking)
+            const bgImage = spot.image_url || 'https://images.unsplash.com/photo-1573348729566-314a40a34951?q=80&w=1000&auto=format&fit=crop';
+
+            card.innerHTML = `
+                <div class="glass-card" style="padding: 1.5rem; height: 100%; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1);">
+                    
+                    <!-- Media Background -->
+                    <div style="position: absolute; top:0; left:0; width:100%; height:140px; z-index:0;">
+                        <img src="${bgImage}" 
+                             onerror="this.src='https://images.unsplash.com/photo-1590674899484-d5640e854abe?q=80&w=1000&auto=format&fit=crop'"
+                             style="width:100%; height:100%; object-fit: cover; opacity: 0.7; mask-image: linear-gradient(to bottom, black 30%, transparent 100%); -webkit-mask-image: linear-gradient(to bottom, black 30%, transparent 100%);">
+                    </div>
+                    
+                    <div style="display: flex; gap: 1rem; align-items: flex-start; margin-bottom: 2rem; position: relative; z-index: 1; margin-top: 3rem;">
+                        <!-- Big Icon -->
+                        <div style="width: 60px; height: 60px; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border-radius: 16px; display: flex; align-items: center; justify-content: center; color: ${cardColor}; box-shadow: 0 4px 12px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);">
+                            <ion-icon name="${cardIcon}" style="font-size: 2rem;"></ion-icon>
                         </div>
                         
-                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: #9ca3af;">
-                            <span style="color: ${cardColor}; font-weight: 600; text-transform: uppercase; font-size: 0.65rem; border: 1px solid ${cardColor}40; padding: 1px 4px; border-radius: 4px;">${cardLabel}</span>
-                            <span>• ${spot.distance}</span>
-                            <span>• ${spot.available} spots</span>
+                        <div style="flex: 1; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">
+                            <h3 style="font-size: 1.4rem; font-weight: 700; color: white; margin-bottom: 0.25rem; line-height: 1.1;">
+                                ${spot.name}
+                            </h3>
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <div style="background: ${availabilityColor}15; color: ${availabilityColor}; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid ${availabilityColor}30; background: rgba(0,0,0,0.4);">
+                                    ${availabilityText} (${spot.available})
+                                </div>
+                                <span style="font-size: 0.85rem; color: #d1d5db; display: flex; align-items: center; gap: 3px;">
+                                   <ion-icon name="location-outline"></ion-icon> ${spot.distance}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style="text-align: right; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">
+                             <div style="font-size: 1.5rem; font-weight: 800; color: white;">GH₵${spot.price}</div>
+                             <div style="font-size: 0.75rem; color: #d1d5db;">per hour</div>
                         </div>
                     </div>
 
-                    <!-- Action -->
-                    <div style="text-align: right; flex-shrink: 0;">
-                        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 4px;">GH₵ ${spot.price}</div>
-                        <div style="display: flex; gap: 6px;">
-                            <a href="${navUrl}" target="_blank" style="background: rgba(255,255,255,0.1); width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white;">
-                                <ion-icon name="navigate" style="font-size: 0.9rem;"></ion-icon>
+                    <!-- Action Area -->
+                    <div style="display: flex; gap: 0.75rem; margin-top: auto; position: relative; z-index: 1;">
+                        
+                        ${isBookedByUser ? `
+                            <!-- BOOKED ACTIONS -->
+                            <a href="${bgImage}" target="_blank" 
+                                style="width: 52px; height: 52px; border-radius: 12px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: white; transition: 0.2s; border: 1px solid rgba(255,255,255,0.2);" title="View Image">
+                                <ion-icon name="image" style="font-size: 1.5rem;"></ion-icon>
                             </a>
-                            <button onclick="reserveSpot(${spot.id}, ${spot.price})" style="background: #6366f1; border: none; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer;">
-                                <ion-icon name="arrow-forward"></ion-icon>
+                            
+                            <button onclick="startAppNavigation({lat:${spot.lat}, lng:${spot.lng}, name:'${spot.name.replace(/'/g, "\\'")}'})" 
+                                style="flex: 1; height: 52px; background: #10b981; color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem; box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);">
+                                NAVIGATE
+                                <ion-icon name="navigate-circle" style="font-size: 1.4rem;"></ion-icon>
                             </button>
-                        </div>
+                        ` : `
+                            <!-- UNBOOKED ACTIONS -->
+                            <div style="width: 52px; height: 52px; border-radius: 12px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; color: white; border: 1px solid rgba(255,255,255,0.05);" title="View Location">
+                                <ion-icon name="location" style="font-size: 1.5rem;"></ion-icon>
+                            </div>
+                            
+                            <button onclick="reserveSpot(${spot.id}, ${spot.price})" 
+                                style="flex: 1; height: 52px; background: linear-gradient(135deg, ${cardColor} 0%, ${cardColor}dd 100%); color: white; border: none; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.75rem; box-shadow: 0 4px 20px ${cardColor}40; transition: transform 0.2s; letter-spacing: 0.5px;">
+                                BOOK SPOT
+                                <ion-icon name="arrow-forward-circle" style="font-size: 1.4rem;"></ion-icon>
+                            </button>
+                        `}
                     </div>
                 </div>`;
             listEl.appendChild(card);
@@ -747,7 +835,16 @@ document.addEventListener('DOMContentLoaded', () => {
                         // 3. Start Enforcer
                         startSessionMonitor();
 
-                        alert("Payment Verified! Timer Started.");
+                        // 4. AUTO-START NAVIGATION
+                        if (parkedSpot) {
+                            startAppNavigation({
+                                lat: parkedSpot.lat,
+                                lng: parkedSpot.lng,
+                                name: parkedSpot.name
+                            });
+                        }
+
+                        alert("Payment Verified! Navigation Started.");
                     }
                 } else {
                     alert("Booking Failed: " + res.message);
@@ -774,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
             widget = document.createElement('div');
             widget.id = 'sessionWidget';
             widget.className = 'glass-card';
-            widget.style.cssText = 'position: fixed; bottom: 20px; left: 20px; right: 20px; z-index: 2000; padding: 1rem; border: 1px solid #6366f1; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); animate: slideUp 0.5s;';
+            widget.style.cssText = 'position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px; z-index: 2000; padding: 1.5rem; border: 1px solid rgba(99, 102, 241, 0.5); box-shadow: 0 10px 40px rgba(0,0,0,0.5); animation: slideUp 0.5s ease-out;';
             document.body.appendChild(widget);
         }
 
@@ -919,6 +1016,27 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
     initWallet();
     startSessionMonitor(); // specific check on load
+
+    // --- ADMIN CANCELLATION LISTENER ---
+    const socket = io(); // Ensure we have socket instance or reuse existing if possible
+    socket.on('force_end_session', (data) => {
+        const session = JSON.parse(localStorage.getItem('activeSession'));
+        if (session && session.spotId == data.spot_id) {
+            console.log("Session forcefully ended by Admin");
+
+            // Clear Session
+            clearInterval(window.sessionInterval);
+            const widget = document.getElementById('sessionWidget');
+            if (widget) widget.remove();
+            localStorage.removeItem('activeSession');
+
+            // Find current spot and refresh UI if needed (force fetch)
+            fetchSpots();
+
+            // Alert User
+            alert("⚠️ " + (data.message || "Your session has been cancelled by the Admin."));
+        }
+    });
 });
 
 // Removed old checkParkedCar/findMyCar logic as it overlaps with new session logic or kept separate? 
