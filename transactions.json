@@ -367,5 +367,14 @@
     "user_name": "Spark Marley",
     "vehicle_plate": "F3F3F",
     "timestamp": 1770220047.4682388
+  },
+  {
+    "id": 1770229616035,
+    "spot_id": 16,
+    "spot_name": "Shell Filling Station - Park",
+    "price": 20.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770229616.0413058
   }
 ]

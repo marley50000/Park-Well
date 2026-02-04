@@ -1,6 +1,6 @@
 {
-    "name": "Park Well",
-    "short_name": "ParkWell",
+    "name": "ParkingSlotAfrica",
+    "short_name": "ParkingSlot",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#030712",

@@ -11,7 +11,7 @@ const Navbar = () => {
                     <div className="logo-icon">
                         <Car size={22} className="text-white" />
                     </div>
-                    <span>Park<span style={{ color: 'var(--color-primary)' }}>Well</span></span>
+                    <span>ParkingSlot<span style={{ color: 'var(--color-primary)' }}>Africa</span></span>
                 </Link>
 
                 <div className="nav-links">

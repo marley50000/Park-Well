@@ -183,7 +183,7 @@ const Dashboard = () => {
                         <div style={{ background: 'var(--color-primary)', padding: '0.375rem', borderRadius: '0.5rem', display: 'flex', boxShadow: '0 0 10px var(--color-primary-glow)' }}>
                             <Car size={20} className="text-white" />
                         </div>
-                        <span>Park<span style={{ color: 'var(--color-primary)' }}>Well</span></span>
+                        <span>ParkingSlot<span style={{ color: 'var(--color-primary)' }}>Africa</span></span>
                     </div>
                     {/* Close button for mobile */}
                     <button
