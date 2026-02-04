@@ -5,11 +5,8 @@
     <!-- Sidebar -->
     <div class="db-sidebar">
         <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 2rem; padding: 0 0.5rem;">
-            <div style="background: #6366f1; border-radius: 4px; padding: 4px; display:flex;">
-                <ion-icon name="person" style="color:white;"></ion-icon>
-            </div>
-            <span style="font-weight: 700; color: white; font-size: 1.25rem;">My<span
-                    style="color: #6366f1;">Park</span></span>
+            <img src="{{ url_for('static', filename='img/Logo.png') }}" alt="ParkWell Logo"
+                style="height: 50px; width: auto;">
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
@@ -24,6 +21,11 @@
             <div id="nav-vehicles" class="nav-item" onclick="switchUserTab('vehicles')"
                 style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; cursor: pointer;">
                 <ion-icon name="car"></ion-icon> My Vehicles
+            </div>
+
+            <div id="nav-spots" class="nav-item" onclick="switchUserTab('spots')"
+                style="display: flex; gap: 0.75rem; padding: 0.75rem; color: #9ca3af; font-weight: 500; align-items: center; cursor: pointer;">
+                <ion-icon name="business"></ion-icon> My Spots
             </div>
 
             {% if is_admin %}
@@ -149,8 +151,40 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Host Parking Section -->
+                <div style="margin-top: 2rem;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem;">Host Parking</h3>
+                    <div class="glass-card"
+                        style="padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.05);">
+                        <div>
+                            <div style="font-weight: 700; color: white;">Earn with your space</div>
+                            <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 4px;">List your driveway or
+                                garage and set your schedule.</div>
+                        </div>
+                        <button onclick="openAddSpotModal()"
+                            style="background: #10b981; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <ion-icon name="add-circle"></ion-icon> List My Spot
+                        </button>
+                    </div>
+                </div>
             </div>
 
+        </div>
+
+        <!-- My Spots Content Section (Hidden by default) -->
+        <div id="user-spots-section" class="hidden" style="margin-top: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                <h3 style="font-size: 1.5rem; font-weight: 700;">My Parking Spots</h3>
+                <button onclick="openAddSpotModal()"
+                    style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                    <ion-icon name="add-circle"></ion-icon> Add New Spot
+                </button>
+            </div>
+            <div id="userSpotsList" class="db-grid">
+                <!-- JS Rendered -->
+                <div style="padding: 2rem; width:100%; text-align: center; color: #9ca3af;">Loading your spots...</div>
+            </div>
         </div>
 
         <!-- Admin Section (Hidden by default, shown via Tab) -->
@@ -218,7 +252,8 @@
 
 <!-- Add/Edit Spot Modal (ADMIN) -->
 <div id="spotModal" class="modal-overlay hidden">
-    <div class="glass-card" style="width: 100%; max-width: 400px; background: #030712; border: 1px solid #374151;">
+    <div class="glass-card custom-scrollbar"
+        style="width: 100%; max-width: 400px; max-height: 85vh; overflow-y: auto; background: #030712; border: 1px solid #374151;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 1.5rem;">
             <h3 id="modalTitle" style="font-weight: 700; font-size: 1.25rem;">Manage Spot</h3>
             <button onclick="closeSpotModal()" style="background: none; border: none; color: white; cursor: pointer;">
@@ -242,7 +277,7 @@
                 <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Pin
                     Location</label>
                 <div id="adminMap"
-                    style="height: 250px; width: 100%; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">
+                    style="height: 180px; width: 100%; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid rgba(255,255,255,0.1);">
                 </div>
                 <div style="font-size: 0.75rem; color: #6366f1;">* Click map to set pin</div>
             </div>
@@ -277,16 +312,100 @@
                         style="width: 100%;">
                 </div>
 
-                <!-- Optional: Keep auto-locate button as fallback -->
-                <button type="button" id="btnGetLocation" onclick="getCurrentLocation()"
-                    style="margin-top: 1rem; width: 100%; background: #374151; color: white; border: none; padding: 10px; border-radius: 6px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <ion-icon name="location"></ion-icon> Capture Current Location
-                </button>
-            </div>
+                <!-- Availability Schedule -->
+                <div style="margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+                    <label
+                        style="color: #6366f1; font-size: 0.9rem; font-weight: 700; display: block; margin-bottom: 0.75rem;">Availability
+                        Schedule</label>
 
-            <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">
-                Save Spot
-            </button>
+                    <div style="margin-bottom: 0.75rem;">
+                        <label
+                            style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Unavailable
+                            Dates (e.g. 2024-12-25, 2025-01-01)</label>
+                        <textarea id="spotUnavailableDates" class="input-glass" placeholder="YYYY-MM-DD, YYYY-MM-DD"
+                            style="width: 100%; height: 60px;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label
+                            style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Unavailable
+                            Days (Recurs Weekly)</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Sunday"> Sun</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Monday"> Mon</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Tuesday"> Tue</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Wednesday"> Wed</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Thursday"> Thu</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Friday"> Fri</label>
+                            <label
+                                style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center;"><input
+                                    type="checkbox" name="uDay" value="Saturday"> Sat</label>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 0.75rem;">
+                        <label style="color: #9ca3af; font-size: 0.8rem; display: block; margin-bottom: 0.5rem;">Reason
+                            for Unavailability</label>
+                        <input type="text" id="spotUnavailableReason" class="input-glass"
+                            placeholder="e.g. Weekly Market, Maintenance" style="width: 100%;">
+                    </div>
+                </div>
+
+                <!-- Amenities Section -->
+                <div style="margin-top: 1rem; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 1rem;">
+                    <label
+                        style="color: #6366f1; font-size: 0.9rem; font-weight: 700; display: block; margin-bottom: 0.75rem;">Amenities</label>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                        <label
+                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" name="amenity" value="cctv"> <ion-icon name="shield-checkmark"
+                                style="color: #10b981;"></ion-icon> CCTV
+                        </label>
+                        <label
+                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" name="amenity" value="covered"> <ion-icon name="umbrella"
+                                style="color: #60a5fa;"></ion-icon> Covered
+                        </label>
+                        <label
+                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" name="amenity" value="ev"> <ion-icon name="flash"
+                                style="color: #f59e0b;"></ion-icon> EV Charge
+                        </label>
+                        <label
+                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" name="amenity" value="disability"> <ion-icon name="accessibility"
+                                style="color: #8b5cf6;"></ion-icon> Accessible
+                        </label>
+                        <label
+                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                            <input type="checkbox" name="amenity" value="24/7"> <ion-icon name="time"
+                                style="color: #ec4899;"></ion-icon> 24/7
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.5rem;">
+                    <button type="button" onclick="getCurrentLocation()"
+                        style="width: 100%; background: #374151; color: white; border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <ion-icon name="locate"></ion-icon> Capture Current Location
+                    </button>
+                </div>
+
+                <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">
+                    Save Spot
+                </button>
         </form>
     </div>
 </div>
@@ -471,10 +590,19 @@
             fetchAdminSpots();
         } else if (tab === 'overview') {
             document.getElementById('user-overview-section').classList.remove('hidden');
+            document.getElementById('user-spots-section').classList.add('hidden');
             document.getElementById('admin-section').classList.add('hidden');
-        } else {
-            // For other tabs not implemented fully in this snippet
+        } else if (tab === 'spots') {
+            document.getElementById('user-overview-section').classList.remove('hidden'); // Keep base structure? No, toggle sections
+            // Simple toggle logic for Sections within User View
             document.getElementById('user-overview-section').classList.add('hidden');
+            document.getElementById('user-spots-section').classList.remove('hidden');
+            document.getElementById('admin-section').classList.add('hidden');
+            fetchUserSpots();
+        } else {
+            // vehicles, wallet etc
+            document.getElementById('user-overview-section').classList.remove('hidden'); // Default back to overview for now or handle specific
+            document.getElementById('user-spots-section').classList.add('hidden');
             document.getElementById('admin-section').classList.add('hidden');
         }
     }
@@ -579,6 +707,36 @@
                 </div>
                 `;
             }).join('');
+
+            // --- ORPHANED SESSIONS (Bug Fix) ---
+            const spotIds = new Set(spots.map(s => s.id));
+            const orphans = sessions.filter(s => !spotIds.has(s.spot_id));
+
+            if (orphans.length > 0) {
+                list.innerHTML += `
+                    <div style="margin-top: 2rem; border-top: 1px dashed rgba(239, 68, 68, 0.4); padding-top: 1rem;">
+                        <h4 style="color: #ef4444; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                            <ion-icon name="warning"></ion-icon> Orphaned Sessions (Spot Deleted)
+                        </h4>
+                        <div style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 1rem;">These sessions are active but their spot no longer exists.</div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem;">
+                `;
+
+                list.innerHTML += orphans.map(s => `
+                    <div style="padding: 1rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                         <div>
+                            <div style="font-weight: 700; color: #fca5a5;">Stuck Session (Spot #${s.spot_id})</div>
+                            <div style="font-size: 0.8rem; color: #9ca3af;">User: ${s.user_name} | Plate: ${s.vehicle_plate}</div>
+                         </div>
+                         <button onclick="adminCancelSession(${s.spot_id})" 
+                            style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                            Force Clear
+                         </button>
+                    </div>
+                `).join('');
+
+                list.innerHTML += `</div></div>`;
+            }
         });
     }
 
@@ -689,6 +847,20 @@
         const imgInput = document.getElementById('spotImage');
         if (imgInput) imgInput.value = spot.image_url || '';
 
+        // Availability Fields
+        document.getElementById('spotUnavailableDates').value = (spot.unavailable_dates || []).join(', ');
+        document.getElementById('spotUnavailableReason').value = spot.unavailable_reason || '';
+
+        // Reset and Set Checkboxes
+        document.querySelectorAll('input[name="uDay"]').forEach(cb => {
+            cb.checked = (spot.unavailable_days || []).includes(cb.value);
+        });
+
+        // Set Amenities checkboxes
+        document.querySelectorAll('input[name="amenity"]').forEach(cb => {
+            cb.checked = (spot.amenities || []).includes(cb.value);
+        });
+
         document.getElementById('spotModal').classList.remove('hidden');
 
         initAdminMap(spot.lat, spot.lng);
@@ -728,7 +900,15 @@
             image_url: document.getElementById('spotImage').value,
             // For security check logic (mocking physical presence if creating new)
             owner_lat: document.getElementById('spotLat').value,
-            owner_lng: document.getElementById('spotLng').value
+            owner_lng: document.getElementById('spotLng').value,
+
+            // Availability Logic
+            unavailable_dates: document.getElementById('spotUnavailableDates').value.split(',').map(s => s.trim()).filter(s => s),
+            unavailable_days: Array.from(document.querySelectorAll('input[name="uDay"]:checked')).map(cb => cb.value),
+            unavailable_reason: document.getElementById('spotUnavailableReason').value,
+
+            // Amenities Logic
+            amenities: Array.from(document.querySelectorAll('input[name="amenity"]:checked')).map(cb => cb.value)
         };
 
         const method = id ? 'PUT' : 'POST';
@@ -744,8 +924,22 @@
                 if (res.message && !res.id && !res.success) { // Error
                     alert(res.message);
                 } else {
+                    // Success: Save ID locally if it's a new spot
+                    if (res.id && !id) {
+                        const mySpots = JSON.parse(localStorage.getItem('myHostedSpots') || '[]');
+                        mySpots.push(res.id);
+                        localStorage.setItem('myHostedSpots', JSON.stringify(mySpots));
+                    }
+
                     closeSpotModal();
-                    fetchAdminSpots();
+
+                    // Refresh view based on where we are
+                    if (typeof fetchAdminSpots === 'function' && !document.getElementById('admin-section').classList.contains('hidden')) {
+                        fetchAdminSpots();
+                    } else {
+                        // User view
+                        fetchUserSpots();
+                    }
                 }
             })
             .catch(err => alert("Error saving spot"));
@@ -754,8 +948,113 @@
     function deleteSpot(id) {
         if (!confirm("Delete this spot permanently?")) return;
         fetch(`/api/spots/${id}`, { method: 'DELETE' })
-            .then(() => fetchAdminSpots());
+            .then(() => {
+                // Remove from local storage if present
+                let mySpots = JSON.parse(localStorage.getItem('myHostedSpots') || '[]');
+                mySpots = mySpots.filter(sid => sid != id);
+                localStorage.setItem('myHostedSpots', JSON.stringify(mySpots));
+
+                // Refresh
+                if (!document.getElementById('admin-section').classList.contains('hidden')) {
+                    fetchAdminSpots();
+                } else {
+                    fetchUserSpots();
+                }
+            });
     }
+
+    // --- USER HOSTING LOGIC ---
+    function fetchUserSpots() {
+        const mySpotIds = JSON.parse(localStorage.getItem('myHostedSpots') || '[]');
+        const list = document.getElementById('userSpotsList');
+
+        if (mySpotIds.length === 0) {
+            list.innerHTML = `
+                <div class="glass-card" style="padding: 2rem; text-align: center; border: 1px dashed rgba(255,255,255,0.1);">
+                    <div style="font-size: 2rem; color: #374151; margin-bottom: 0.5rem;"><ion-icon name="business"></ion-icon></div>
+                    <div style="color: #9ca3af;">You haven't listed any spots yet.</div>
+                    <button onclick="openAddSpotModal()" style="margin-top: 1rem; background: none; color: #10b981; border: 1px solid #10b981; padding: 6px 12px; border-radius: 6px; cursor: pointer;">List First Spot</button>
+                </div>`;
+            return;
+        }
+
+        fetch('/api/spots')
+            .then(r => r.json())
+            .then(allSpots => {
+                const mySpots = allSpots.filter(s => mySpotIds.includes(s.id));
+
+                if (mySpots.length === 0) {
+                    // Maybe they were deleted on server? Sync?
+                    list.innerHTML = '<div style="padding: 1rem; color: #9ca3af;">No active spots found.</div>';
+                    return;
+                }
+
+                list.innerHTML = mySpots.map(s => {
+                    const bgImage = s.image_url || 'https://images.unsplash.com/photo-1573348729566-314a40a34951?q=80&w=1000&auto=format&fit=crop';
+
+                    return `
+                    <div class="glass-card" style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+                        <div style="height: 120px; position: relative;">
+                             <img src="${bgImage}" style="width: 100%; height: 100%; object-fit: cover;">
+                             <div style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); padding: 4px 8px; border-radius: 6px; color: white; font-weight: 700; font-size: 0.8rem;">
+                                GH₵ ${s.price}/hr
+                             </div>
+                        </div>
+                        <div style="padding: 1rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                <h4 style="font-size: 1.1rem; font-weight: 700; color: white;">${s.name}</h4>
+                                <span style="font-size: 0.75rem; color: ${s.unavailable_days && s.unavailable_days.length > 0 ? '#f59e0b' : '#10b981'}; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px;">
+                                    ${s.unavailable_days && s.unavailable_days.length > 0 ? 'Custom Schedule' : 'Always Open'}
+                                </span>
+                            </div>
+                            
+                            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                <button onclick='openEditSpotModal(${JSON.stringify(s).replace(/'/g, "&#39;")})' 
+                                    style="flex: 1; background: rgba(255,255,255,0.1); border: none; color: white; padding: 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 0.85rem;">
+                                    <ion-icon name="create"></ion-icon> Edit
+                                </button>
+                                <button onclick="deleteSpot(${s.id})" 
+                                    style="background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; padding: 8px 12px; border-radius: 6px; cursor: pointer;">
+                                    <ion-icon name="trash"></ion-icon>
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            });
+    }
+
+    // --- SOCKET.IO HANDLING ---
+    const socket = io();
+
+    socket.on('connect', () => {
+        console.log("Connected to ParkWell Live");
+    });
+
+    socket.on('data_update', (data) => {
+        // Refresh whatever view is active
+        if (!document.getElementById('admin-section').classList.contains('hidden')) {
+            fetchAdminSpots();
+        } else if (!document.getElementById('user-spots-section').classList.contains('hidden')) {
+            fetchUserSpots();
+        }
+        // Force status update if something relevant happened
+        updateStatusDisplay();
+    });
+
+    socket.on('force_end_session', (data) => {
+        // Check if this affects US (the current user)
+        const currentSession = JSON.parse(localStorage.getItem('activeSession'));
+        if (currentSession && currentSession.spot_id == data.spot_id) {
+            alert("⚠️ Your session has been ended by the admin.\nReason: " + (data.message || "Unknown"));
+            localStorage.removeItem('activeSession');
+            updateStatusDisplay();
+        }
+        // If admin is viewing, refresh list
+        if (!document.getElementById('admin-section').classList.contains('hidden')) {
+            fetchAdminSpots();
+        }
+    });
 
 </script>
 {% endblock %}

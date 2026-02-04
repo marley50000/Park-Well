@@ -331,5 +331,41 @@
     "user_name": "y8i",
     "vehicle_plate": "F3F3F",
     "timestamp": 1770143804.597888
+  },
+  {
+    "id": 1770195679054,
+    "spot_id": 12,
+    "spot_name": "New Space",
+    "price": 45.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770195679.0544295
+  },
+  {
+    "id": 1770195743659,
+    "spot_id": 16,
+    "spot_name": "Shell Filling Station - Park",
+    "price": 20.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770195743.6593957
+  },
+  {
+    "id": 1770218800522,
+    "spot_id": 13,
+    "spot_name": "DVLA Space",
+    "price": 45.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770218800.5223308
+  },
+  {
+    "id": 1770220047468,
+    "spot_id": 18,
+    "spot_name": "NaaSpace 2",
+    "price": 12.0,
+    "user_name": "Spark Marley",
+    "vehicle_plate": "F3F3F",
+    "timestamp": 1770220047.4682388
   }
 ]

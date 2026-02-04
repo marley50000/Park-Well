@@ -2,9 +2,9 @@
   {
     "name": "New Space",
     "price": 45.0,
-    "available": 5,
-    "lat": 5.575264,
-    "lng": -0.154254,
+    "available": 8,
+    "lat": 5.580515,
+    "lng": -0.14323,
     "owner_lat": "5.575264",
     "owner_lng": "-0.154254",
     "id": 12,
@@ -59,8 +59,8 @@
     "name": "Shell Filling Station - Park",
     "price": 20.0,
     "available": 10,
-    "lat": 5.576735,
-    "lng": -0.152822,
+    "lat": 5.576404,
+    "lng": -0.152725,
     "image_url": "https://lh3.googleusercontent.com/gps-cs-s/AHVAweof8WCQjZanB912W7tQCBZR21gYFyOfXb9_dnUbWLj5MFQULbVJkWsEUN74BsQlenJW5e_iBWg826cQUMOU4zRsTEhnBKz0SOZK4MgXmgWxZ41Rp8WxCv-oWcvu6gkHtjC-yAs=s680-w680-h510-rw",
     "owner_lat": "5.576735",
     "owner_lng": "-0.152822",
@@ -68,5 +68,25 @@
     "distance": "0.5 km",
     "trust_level": 3,
     "qr_code_id": "PW-FDC296C2"
+  },
+  {
+    "name": "NaaSpace",
+    "price": 12.0,
+    "available": 12,
+    "lat": 5.571502,
+    "lng": -0.141728,
+    "image_url": "https://lh3.googleusercontent.com/gps-cs-s/AHVAwergGe1f3MwTKhwefqQKsCA0pAUGfrMYq1Uj9DZE0NcDt3GhyAxdkBTV8EcSAiv7bWtxU5AH3UEnpuS0YQxV2OoXlygmoPsFCauUpgqSFWYgH7ajsv4rcyeXSGA_1Z1SIvI0u7Y=s680-w680-h510-rw",
+    "owner_lat": "5.571502",
+    "owner_lng": "-0.141728",
+    "unavailable_dates": [],
+    "unavailable_days": [
+      "Sunday",
+      "Monday"
+    ],
+    "unavailable_reason": "Full During thse Days",
+    "id": 17,
+    "distance": "0.5 km",
+    "trust_level": 3,
+    "qr_code_id": "PW-33E6E5C4"
   }
 ]

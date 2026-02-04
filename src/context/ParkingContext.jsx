@@ -1,57 +1,107 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 
 const ParkingContext = createContext();
 
 export const useParking = () => useContext(ParkingContext);
 
-const INITIAL_SPOTS = [
-    { id: 1, name: 'Downtown Plaza Garage', position: [40.7128, -74.0060], price: 12, available: 14, distance: '0.2 mi' },
-    { id: 2, name: 'Westside Auto Park', position: [40.7150, -74.0090], price: 8, available: 3, distance: '0.8 mi' },
-    { id: 3, name: 'Times Square Valet', position: [40.7100, -74.0020], price: 25, available: 0, distance: '1.2 mi' },
-    { id: 4, name: 'Hudson River Lot', position: [40.7180, -74.0100], price: 15, available: 42, distance: '0.5 mi' },
-];
-
 export const ParkingProvider = ({ children }) => {
-    // Initialize from LocalStorage or use default
-    const [spots, setSpots] = useState(() => {
-        const saved = localStorage.getItem('parkwell_spots');
-        return saved ? JSON.parse(saved) : INITIAL_SPOTS;
-    });
+    const [spots, setSpots] = useState([]);
 
-    // Persist to LocalStorage on change
-    React.useEffect(() => {
-        localStorage.setItem('parkwell_spots', JSON.stringify(spots));
-    }, [spots]);
+    // Load initial data from API
+    useEffect(() => {
+        fetchSpots();
+        // Setup polling or socket listener could go here
+    }, []);
 
-    const addSpot = (spot) => {
-        const newSpot = {
-            ...spot,
-            id: Date.now(),
-            distance: '0.5 mi', // Default for simulated locations
-            position: [parseFloat(spot.lat), parseFloat(spot.lng)],
-            available: parseInt(spot.available) || 0,
-            price: parseFloat(spot.price) || 0
-        };
-        setSpots([...spots, newSpot]);
-    };
-
-    const deleteSpot = (id) => {
-        setSpots(spots.filter(s => s.id !== id));
-    };
-
-    const reserveSpot = (id) => {
-        setSpots(spots.map(s => {
-            if (s.id === id) {
-                if (s.available > 0) {
-                    return { ...s, available: s.available - 1 };
-                }
+    const fetchSpots = async () => {
+        try {
+            const res = await fetch('/api/spots');
+            if (res.ok) {
+                const data = await res.json();
+                setSpots(data);
             }
-            return s;
-        }));
+        } catch (error) {
+            console.error("Failed to fetch spots", error);
+        }
+    };
+
+    const addSpot = async (spotData) => {
+        try {
+            const res = await fetch('/api/spots', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(spotData)
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                // Return error to caller
+                throw new Error(data.message || 'Failed to add spot');
+            }
+
+            // Optimistic update or refetch
+            setSpots(prev => [...prev, data]);
+            return { success: true };
+        } catch (error) {
+            console.error("Add Spot Error:", error);
+            // Propagate error to UI for display
+            throw error;
+        }
+    };
+
+    const deleteSpot = async (id) => {
+        try {
+            await fetch(`/api/spots/${id}`, { method: 'DELETE' });
+            setSpots(spots.filter(s => s.id !== id));
+        } catch (error) {
+            console.error("Delete failed", error);
+        }
+    };
+
+    const reserveSpot = async (id) => {
+        // Placeholder for reserve logic contacting API
+        // For now just update local state to match UI expectation until we fully wire it up
+        try {
+            await fetch(`/api/reserve/${id}`, { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } });
+            setSpots(spots.map(s => s.id === id && s.available > 0 ? { ...s, available: s.available - 1 } : s));
+        } catch (error) {
+            console.error("Reserve failed", error);
+        }
+    };
+
+    const undoAction = async () => {
+        try {
+            const res = await fetch('/api/admin/undo', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                fetchSpots(); // Refresh local state
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
+    };
+
+    const redoAction = async () => {
+        try {
+            const res = await fetch('/api/admin/redo', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                fetchSpots();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
     };
 
     return (
-        <ParkingContext.Provider value={{ spots, addSpot, deleteSpot, reserveSpot }}>
+        <ParkingContext.Provider value={{ spots, addSpot, deleteSpot, reserveSpot, undoAction, redoAction }}>
             {children}
         </ParkingContext.Provider>
     );

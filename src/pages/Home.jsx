@@ -4,6 +4,7 @@ import Navbar from '../components/layout/Navbar';
 import MapView from '../components/map/MapView';
 import { Search, MapPin, SlidersHorizontal } from 'lucide-react';
 import { useParking } from '../context/ParkingContext';
+import VoiceAssistant from '../components/ai/VoiceAssistant';
 
 const Home = () => {
     const { spots, reserveSpot } = useParking();
@@ -13,18 +14,37 @@ const Home = () => {
     // Filter logic
     const filteredSpots = spots.filter(spot => {
         const matchesSearch = spot.name.toLowerCase().includes(searchTerm.toLowerCase());
-        // Basic mock filter logic - in real app would check properties
+
         if (filter === 'All') return matchesSearch;
-        if (filter === 'Nearby') return matchesSearch && parseFloat(spot.distance) < 0.5;
-        if (filter === 'Lowest Price') return matchesSearch && spot.price < 15;
-        // ... extend as needed
+        if (filter === 'Nearby') return matchesSearch && (spot.distance.includes('0.') || parseFloat(spot.distance) < 0.5); // Adapt for string/number
+        if (filter === 'Lowest Price') return matchesSearch && parseFloat(spot.price) < 15;
+        if (filter === 'Available') return matchesSearch && spot.available > 0;
+
         return matchesSearch;
+    }).sort((a, b) => {
+        if (filter === 'Lowest Price') {
+            return parseFloat(a.price) - parseFloat(b.price);
+        }
+        return 0; // Default order
     });
+
+    const handleVoiceCommand = (cmd) => {
+        if (cmd === 'filter:price') setFilter('Lowest Price');
+        else if (cmd === 'filter:distance') setFilter('Nearby');
+        else if (cmd === 'filter:all') { setFilter('All'); setSearchTerm(''); }
+        else if (cmd === 'filter:available') setFilter('Available');
+        else if (cmd.startsWith('search:')) {
+            const term = cmd.replace('search:', '');
+            setSearchTerm(term);
+            setFilter('All');
+        }
+    };
 
     const handleReserve = (spot) => {
         if (spot.available > 0) {
+            const points = 10 + Math.floor(spot.price);
             reserveSpot(spot.id);
-            alert(`Reservation Confirmed for ${spot.name}!\n\nNavigate to spot to claim.`);
+            alert(`Reservation Confirmed for ${spot.name}!\n\n🎉 +${points} ParkPoints Earned!\nNavigate to spot to claim.`);
         } else {
             alert('Sorry, this lot is full.');
         }
@@ -96,8 +116,13 @@ const Home = () => {
                                             </button>
                                         </div>
                                     </div>
-                                    <div style={{ color: '#818cf8', background: 'rgba(99, 102, 241, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold' }}>
-                                        ${spot.price}/hr
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                                        <div style={{ color: '#818cf8', background: 'rgba(99, 102, 241, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '0.5rem', fontSize: '0.875rem', fontWeight: 'bold' }}>
+                                            ${spot.price}/hr
+                                        </div>
+                                        <div style={{ fontSize: '0.65rem', color: '#fbbf24', fontWeight: 'bold' }}>
+                                            +{10 + Math.floor(spot.price)} pts
+                                        </div>
                                     </div>
                                 </div>
 
@@ -126,6 +151,8 @@ const Home = () => {
                     )}
                 </div>
             </div>
+
+            <VoiceAssistant onCommand={handleVoiceCommand} />
         </div>
     );
 };

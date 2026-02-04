@@ -6,6 +6,12 @@ import math
 from functools import wraps
 from flask_socketio import SocketIO, emit
 import uuid
+import copy
+
+# --- Undo/Redo Stacks ---
+UNDO_STACK = []
+REDO_STACK = []
+MAX_HISTORY = 20
 
 app = Flask(__name__)
 app.secret_key = 'parkwell_secret_key_ghana_living_legends' # Change in production
@@ -15,6 +21,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 DATA_FILE = 'parking_data.json'
 TRANSACTIONS_FILE = 'transactions.json'
 SESSIONS_FILE = 'active_sessions.json'
+USERS_FILE = 'users.json'
 
 # --- In-Memory Globals (For Vercel/Read-Only Support) ---
 # We load these once on startup. Writes update these globals + try to write to disk.
@@ -36,12 +43,33 @@ try:
 except:
     MEM_SESSIONS = []
 
+try:
+    with open(USERS_FILE, 'r') as f:
+        MEM_USERS = json.load(f)
+except:
+    # Default Demo User
+    MEM_USERS = [{
+        'id': 'user_123', 
+        'name': 'Alex Driver', 
+        'points': 120, 
+        'tier': 'Bronze',
+        'history': []
+    }]
+
 # --- Helpers ---
 def load_data():
-    return MEM_DATA
+    # Return a deep copy so routes don't mutate global state in-place before saving
+    return copy.deepcopy(MEM_DATA)
 
-def save_data(data):
-    global MEM_DATA
+def save_data(data, push_history=True):
+    global MEM_DATA, UNDO_STACK, REDO_STACK
+    
+    if push_history:
+        UNDO_STACK.append(copy.deepcopy(MEM_DATA))
+        if len(UNDO_STACK) > MAX_HISTORY:
+            UNDO_STACK.pop(0)
+        REDO_STACK.clear() # New action clears redo history
+    
     MEM_DATA = data
     try:
         with open(DATA_FILE, 'w') as f:
@@ -82,6 +110,24 @@ def remove_session(spot_id):
     except OSError:
         pass
 
+def load_users():
+    return MEM_USERS
+
+def save_users(users):
+    global MEM_USERS
+    MEM_USERS = users
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(MEM_USERS, f, indent=2)
+    except OSError:
+        pass
+
+def get_tier(points):
+    if points >= 1000: return 'Platinum'
+    if points >= 500: return 'Gold'
+    if points >= 200: return 'Silver'
+    return 'Bronze'
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -107,7 +153,7 @@ def login():
         password = request.form.get('password')
         if username == 'admin' and password == 'password123':
             session['admin'] = True
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('admin_dashboard'))
         else:
             return render_template('login.html', error="Invalid credentials")
     return render_template('login.html')
@@ -119,7 +165,14 @@ def logout():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html', is_admin=('admin' in session))
+    # Public/User Dashboard (Always show user view, never admin controls)
+    return render_template('dashboard.html', is_admin=False)
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    if 'admin' not in session:
+        return redirect(url_for('login'))
+    return render_template('dashboard.html', is_admin=True)
 
 # --- API ---
 @app.route('/api/spots', methods=['GET'])
@@ -138,8 +191,10 @@ def haversine(lat1, lon1, lat2, lon2):
 
 @app.route('/api/spots', methods=['POST'])
 def add_spot():
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
+    # if 'admin' not in session:
+    #     return jsonify({'message': 'Unauthorized'}), 401
+    
+    # Allow community submissions (Host Mode)
         
     data = load_data()
     new_spot = request.json
@@ -158,9 +213,36 @@ def add_spot():
     new_spot['available'] = int(new_spot['available'])
     new_spot['distance'] = "0.5 km" # Mocked for display
     
+    # --- STRICT GPS SECURITY CHECK (Physical Presence) ---
+    if 'admin' not in session:
+        # User MUST be physically present (within 100m)
+        user_lat = new_spot.get('user_lat')
+        user_lng = new_spot.get('user_lng')
+        
+        if user_lat is None or user_lng is None:
+            return jsonify({'message': 'Location verification required.\nPlease enable GPS to prove you are at the location.'}), 400
+            
+        try:
+            # We already have haversine function in scope
+            dist_meters = haversine(spot_lat, spot_lng, float(user_lat), float(user_lng))
+        except:
+             return jsonify({'message': 'Invalid user coordinates.'}), 400
+
+        if dist_meters > 100: # 100 meters tolerance
+            return jsonify({'message': f'You are too far away ({int(dist_meters)}m).\nYou must be physically present to add this spot.'}), 403
+    # -----------------------------------------------------
+    
     # Trust Level
     new_spot['trust_level'] = int(new_spot.get('trust_level', 3))
     new_spot['image_url'] = new_spot.get('image_url', '') # Media URL
+    
+    # Availability Schedule
+    new_spot['unavailable_dates'] = new_spot.get('unavailable_dates', [])
+    new_spot['unavailable_days'] = new_spot.get('unavailable_days', [])
+    new_spot['unavailable_reason'] = new_spot.get('unavailable_reason', '')
+    
+    # Amenities
+    new_spot['amenities'] = new_spot.get('amenities', [])
     
     # --- STRICT GPS SECURITY CHECK ---
     owner_lat = new_spot.get('owner_lat')
@@ -182,8 +264,8 @@ def add_spot():
 
 @app.route('/api/spots/<int:spot_id>', methods=['PUT'])
 def edit_spot(spot_id):
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
+    # if 'admin' not in session:
+    #     return jsonify({'message': 'Unauthorized'}), 401
 
     data = load_data()
     updated_info = request.json
@@ -196,6 +278,14 @@ def edit_spot(spot_id):
             spot['lat'] = float(updated_info.get('lat', spot['lat']))
             spot['lng'] = float(updated_info.get('lng', spot['lng']))
             spot['image_url'] = updated_info.get('image_url', spot.get('image_url', ''))
+            
+            # Availability Schedule
+            spot['unavailable_dates'] = updated_info.get('unavailable_dates', spot.get('unavailable_dates', []))
+            spot['unavailable_days'] = updated_info.get('unavailable_days', spot.get('unavailable_days', []))
+            spot['unavailable_reason'] = updated_info.get('unavailable_reason', spot.get('unavailable_reason', ''))
+            
+            # Amenities
+            spot['amenities'] = updated_info.get('amenities', spot.get('amenities', []))
             
             if 'trust_level' in updated_info and updated_info['trust_level']:
                  spot['trust_level'] = int(updated_info['trust_level'])
@@ -211,12 +301,15 @@ def edit_spot(spot_id):
 
 @app.route('/api/spots/<int:spot_id>', methods=['DELETE'])
 def delete_spot(spot_id):
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
+    # if 'admin' not in session:
+    #     return jsonify({'message': 'Unauthorized'}), 401
         
     data = load_data()
     data = [s for s in data if s['id'] != spot_id]
     save_data(data)
+    
+    # Cascade delete: Remove active sessions for this spot
+    remove_session(spot_id)
     
     # Broadcast update
     socketio.emit('data_update', {'type': 'spot_deleted'})
@@ -257,6 +350,24 @@ def reserve_spot(spot_id):
                     'price': spot['price']
                 }
                 save_session(session_obj)
+
+                # --- REWARDS SYSTEM ---
+                # Award points (e.g. 10 points per booking + 1 per dollar)
+                earned_points = 10 + int(spot['price'])
+                
+                users = load_users()
+                # Assuming single demo user for now
+                user = users[0] 
+                user['points'] += earned_points
+                user['tier'] = get_tier(user['points'])
+                user['history'].append({
+                    'action': 'Booking',
+                    'points': earned_points, 
+                    'spot': spot['name'],
+                    'date': time.strftime("%Y-%m-%d")
+                })
+                save_users(users)
+                # ----------------------
 
                 # Broadcast update (affects availability and revenue)
                 socketio.emit('data_update', {'type': 'reservation'})
@@ -300,7 +411,52 @@ def cancel_booking():
 
             return jsonify({'success': True, 'message': 'Session cancelled, spot freed.'})
 
+    # If spot not found, check if we have a zombie session to clean up
+    sessions = load_sessions()
+    zombie = next((s for s in sessions if s['spot_id'] == spot_id), None)
+    if zombie:
+        remove_session(spot_id)
+        socketio.emit('data_update', {'type': 'cancellation'})
+        return jsonify({'success': True, 'message': 'Orphaned session removed.'})
+
     return jsonify({'success': False, 'message': 'Spot not found'}), 404
+
+@app.route('/api/admin/undo', methods=['POST'])
+def undo_action():
+    if 'admin' not in session: return jsonify({'message': 'Unauthorized'}), 401
+    
+    global MEM_DATA, UNDO_STACK, REDO_STACK
+    if not UNDO_STACK:
+        return jsonify({'success': False, 'message': 'Nothing to undo'})
+    
+    # Push current to redo
+    REDO_STACK.append(copy.deepcopy(MEM_DATA))
+    
+    # Restore from undo
+    prev_state = UNDO_STACK.pop()
+    save_data(prev_state, push_history=False) # Don't push to undo stack again
+    
+    # Broadcast
+    socketio.emit('data_update', {'type': 'undo'})
+    return jsonify({'success': True, 'message': 'Action undone'})
+
+@app.route('/api/admin/redo', methods=['POST'])
+def redo_action():
+    if 'admin' not in session: return jsonify({'message': 'Unauthorized'}), 401
+    
+    global MEM_DATA, UNDO_STACK, REDO_STACK
+    if not REDO_STACK:
+        return jsonify({'success': False, 'message': 'Nothing to redo'})
+        
+    # Push current to undo as if it's a new action (but we orchestrate it)
+    UNDO_STACK.append(copy.deepcopy(MEM_DATA))
+    
+    # Restore from redo
+    next_state = REDO_STACK.pop()
+    save_data(next_state, push_history=False)
+    
+    socketio.emit('data_update', {'type': 'redo'})
+    return jsonify({'success': True, 'message': 'Action redone'})
 
 @app.route('/receipt/<int:txn_id>')
 def view_receipt(txn_id):
@@ -341,6 +497,11 @@ def get_analytics():
         'total_bookings': len(transactions),
         'recent_activity': recent_transactions
     })
+
+@app.route('/api/user/profile', methods=['GET'])
+def get_user_profile():
+    # Return the demo user
+    return jsonify(load_users()[0])
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)

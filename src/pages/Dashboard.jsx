@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { LayoutDashboard, Wallet, Car, BarChart3, Settings, TrendingUp, Users, Menu, X, Trash2, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { LayoutDashboard, Wallet, Car, BarChart3, Settings, TrendingUp, Users, Menu, X, Trash2, Plus, RotateCcw, RotateCw, AlertTriangle } from 'lucide-react';
 import { useParking } from '../context/ParkingContext';
 
 const SidebarItem = ({ icon: Icon, label, active }) => (
@@ -29,15 +29,90 @@ const StatCard = ({ title, value, sub, icon: Icon, trend }) => (
 
 const Dashboard = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { spots, addSpot, deleteSpot } = useParking();
+    const { spots, addSpot, deleteSpot, undoAction, redoAction } = useParking();
     const [showAddModal, setShowAddModal] = useState(false);
     const [newSpot, setNewSpot] = useState({ name: '', price: '', available: '', lat: '', lng: '' });
+    const [activeSessions, setActiveSessions] = useState([]);
 
-    const handleAddSpot = (e) => {
+    useEffect(() => {
+        fetchActiveSessions();
+        const interval = setInterval(fetchActiveSessions, 5000); // Poll for updates
+        return () => clearInterval(interval);
+    }, []);
+
+    const fetchActiveSessions = async () => {
+        try {
+            const res = await fetch('/api/admin/sessions');
+            if (res.ok) {
+                const data = await res.json();
+                setActiveSessions(data);
+            }
+        } catch (e) {
+            console.error("Failed to fetch sessions", e);
+        }
+    };
+
+    const handleCancelSession = async (spotId) => {
+        if (!window.confirm("Force cancel this session? This cannot be undone.")) return;
+        try {
+            const res = await fetch('/api/admin/cancel_booking', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ spot_id: spotId })
+            });
+            if (res.ok) {
+                alert("Session terminated.");
+                fetchActiveSessions();
+            } else {
+                alert("Failed to cancel.");
+            }
+        } catch (e) {
+            alert("Error canceling session.");
+        }
+    };
+
+    const handleAddSpot = async (e) => {
         e.preventDefault();
-        addSpot(newSpot);
-        setShowAddModal(false);
-        setNewSpot({ name: '', price: '', available: '', lat: '', lng: '' });
+
+        // Check for Geolocation
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser. You cannot add a spot.");
+            return;
+        }
+
+        const submitSpot = (position) => {
+            const payload = {
+                ...newSpot,
+                user_lat: position ? position.coords.latitude : null,
+                user_lng: position ? position.coords.longitude : null
+            };
+
+            addSpot(payload)
+                .then(() => {
+                    setShowAddModal(false);
+                    setNewSpot({ name: '', price: '', available: '', lat: '', lng: '' });
+                    alert("Location added successfully!");
+                })
+                .catch(err => {
+                    alert(`Error: ${err.message}`);
+                });
+        };
+
+        // Try to get location
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                submitSpot(position);
+            },
+            (error) => {
+                // If location denied, still try to submit (maybe they are admin, let backend decide)
+                // Or if we want strict enforcement on frontend too:
+                console.warn("Location access denied or failed", error);
+
+                // We send null, backend will reject if not admin
+                submitSpot(null);
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
     };
 
     return (
@@ -84,6 +159,17 @@ const Dashboard = () => {
                                     <input required type="number" step="any" className="input-glass" placeholder="-74.0060" value={newSpot.lng} onChange={e => setNewSpot({ ...newSpot, lng: e.target.value })} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.75rem', borderRadius: '0.5rem', width: '100%', color: 'white' }} />
                                 </div>
                             </div>
+                            <button
+                                type="button"
+                                className="text-xs text-indigo-400 underline mb-2"
+                                onClick={() => {
+                                    navigator.geolocation.getCurrentPosition(pos => {
+                                        setNewSpot({ ...newSpot, lat: pos.coords.latitude, lng: pos.coords.longitude });
+                                    });
+                                }}
+                            >
+                                Use My Current Location
+                            </button>
                             <button type="submit" className="btn-primary" style={{ justifyContent: 'center', marginTop: '1rem' }}>Create Location</button>
                         </form>
                     </div>
@@ -141,6 +227,17 @@ const Dashboard = () => {
                         <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Dashboard Overview</h1>
                     </div>
                     <div className="flex-items-center" style={{ gap: '1rem' }}>
+                        {/* Undo / Redo Controls */}
+                        <div className="flex bg-white/5 rounded-lg p-1 mr-2 border border-white/10">
+                            <button onClick={undoAction} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Undo Last Action">
+                                <RotateCcw size={18} />
+                            </button>
+                            <div className="w-px bg-white/10 mx-1"></div>
+                            <button onClick={redoAction} className="p-2 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors" title="Redo Action">
+                                <RotateCw size={18} />
+                            </button>
+                        </div>
+
                         <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm">
                             <Plus size={16} /> Add New Lot
                         </button>
@@ -198,15 +295,35 @@ const Dashboard = () => {
                         </div>
 
                         <div className="glass-card" style={{ height: '24rem', display: 'flex', flexDirection: 'column', background: 'rgba(17, 24, 39, 0.4)' }}>
-                            <h3 className="font-bold mb-4">Revenue Analytics</h3>
-                            {/* CSS Chart Mock */}
-                            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '1rem', paddingBottom: '0.5rem' }}>
-                                {[40, 65, 45, 80, 55, 90, 70].map((h, i) => (
-                                    <div key={i} className="chart-bar" style={{ height: `${h}%` }}></div>
+                            <h3 className="font-bold mb-4 flex items-center gap-2">
+                                <AlertTriangle className="text-yellow-500" size={20} />
+                                Active Sessions Management
+                            </h3>
+
+                            <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                {activeSessions.map((session, idx) => (
+                                    <div key={idx} className="flex-items-center justify-between p-3 mb-2 rounded-xl bg-white/5 border border-white/5 hover:border-yellow-500/30 transition-colors">
+                                        <div>
+                                            <h4 className="font-bold text-sm text-yellow-100">{session.user_name}</h4>
+                                            <p className="text-xs text-muted">Vehicle: {session.vehicle_plate}</p>
+                                            <p className="text-xs text-gray-500">Spot ID: {session.spot_id}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCancelSession(session.spot_id)}
+                                            className="px-3 py-1 bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold rounded-lg border border-red-500/20 transition-colors"
+                                        >
+                                            Force End
+                                        </button>
+                                    </div>
                                 ))}
-                            </div>
-                            <div className="flex-items-center" style={{ justifyContent: 'space-between', fontSize: '0.75rem', color: '#9ca3af', marginTop: '0.5rem' }}>
-                                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <span key={d} style={{ flex: 1, textAlign: 'center' }}>{d}</span>)}
+                                {activeSessions.length === 0 && (
+                                    <div className="text-center text-muted py-8 flex flex-col items-center">
+                                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-2">
+                                            <Car className="text-gray-600" size={24} />
+                                        </div>
+                                        <p>No active sessions.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

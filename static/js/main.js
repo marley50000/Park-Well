@@ -107,6 +107,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 allSpots = spots;
+
+                // --- SELF-HEALING: Verify Active Session ---
+                const currentSession = JSON.parse(localStorage.getItem('activeSession'));
+                if (currentSession) {
+                    const spotStillExists = spots.find(s => s.id == currentSession.spotId);
+                    if (!spotStillExists) {
+                        console.warn("Active session spot no longer exists (Deleted by Admin). Auto-clearing.");
+                        // Clear Session
+                        if (window.sessionInterval) clearInterval(window.sessionInterval);
+                        clearInterval(window.sessionInterval);
+                        const widget = document.getElementById('sessionWidget');
+                        if (widget) widget.remove();
+                        localStorage.removeItem('activeSession');
+
+                        // Small non-blocking toast instead of alert to not annoy if it happens in background
+                        // But for now, alert is safer to ensure they know why it vanished
+                        // alert("Notice: Your active session was closed because the parking spot was removed.");
+                    }
+                }
+
                 renderSpots(spots);
 
                 // AUTO-ROUTING LOGIC
@@ -170,6 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clear Markers
         Object.values(markers).forEach(m => map.removeLayer(m));
         markers = {};
+
+        // Date Logic for Availability
+        const nowLocal = new Date();
+        const todayDateString = nowLocal.toISOString().split('T')[0]; // YYYY-MM-DD
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const todayDayName = days[nowLocal.getDay()];
 
         // --- PRIVACY & COMMITMENT LOGIC ---
         spots.forEach(spot => {
@@ -281,10 +307,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'spot-card-item'; // New wrapper class
 
-            // Availability
+            // Availability Check
+            const unavailableDates = spot.unavailable_dates || [];
+            const unavailableDays = spot.unavailable_days || [];
+            let isUnavailable = false;
+
+            if (unavailableDates.includes(todayDateString)) isUnavailable = true;
+            if (unavailableDays.includes(todayDayName)) isUnavailable = true;
+
+            // Availability Badge
             let availabilityColor = '#10b981';
             let availabilityText = 'Available';
-            if (spot.available === 0) {
+
+            if (isUnavailable) {
+                availabilityColor = '#6b7280'; // Gray
+                availabilityText = 'Closed';
+            } else if (spot.available === 0) {
                 availabilityColor = '#ef4444';
                 availabilityText = 'Full';
             } else if (spot.available < 3) {
@@ -315,13 +353,26 @@ document.addEventListener('DOMContentLoaded', () => {
                             <h3 style="font-size: 1.4rem; font-weight: 700; color: white; margin-bottom: 0.25rem; line-height: 1.1;">
                                 ${spot.name}
                             </h3>
-                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
                                 <div style="background: ${availabilityColor}15; color: ${availabilityColor}; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid ${availabilityColor}30; background: rgba(0,0,0,0.4);">
                                     ${availabilityText} (${spot.available})
                                 </div>
                                 <span style="font-size: 0.85rem; color: #d1d5db; display: flex; align-items: center; gap: 3px;">
                                    <ion-icon name="location-outline"></ion-icon> ${spot.distance}
                                 </span>
+                            </div>
+                            
+                            <!-- Amenities Icons -->
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                ${(spot.amenities || []).map(a => {
+                let icon = 'ellipse'; let color = '#9ca3af';
+                if (a === 'cctv') { icon = 'shield-checkmark'; color = '#10b981'; }
+                if (a === 'covered') { icon = 'umbrella'; color = '#60a5fa'; }
+                if (a === 'ev') { icon = 'flash'; color = '#f59e0b'; }
+                if (a === 'disability') { icon = 'accessibility'; color = '#8b5cf6'; }
+                if (a === '24/7') { icon = 'time'; color = '#ec4899'; }
+                return `<div title="${a}" style="background: rgba(255,255,255,0.1); padding: 4px; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><ion-icon name="${icon}" style="color: ${color}; font-size: 0.9rem;"></ion-icon></div>`;
+            }).join('')}
                             </div>
                         </div>
 
@@ -334,7 +385,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     <!-- Action Area -->
                     <div style="display: flex; gap: 0.75rem; margin-top: auto; position: relative; z-index: 1;">
                         
-                        ${isBookedByUser ? `
+                        ${isUnavailable ? `
+                            <!-- UNAVAILABLE ACTION -->
+                            <div style="width: 100%; display: flex; flex-direction: column; gap: 4px;">
+                                <button disabled
+                                    style="width: 100%; height: 52px; background: rgba(55, 65, 81, 0.5); color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: not-allowed; display: flex; align-items: center; justify-content: center; gap: 0.75rem;">
+                                    UNAVAILABLE
+                                    <ion-icon name="ban" style="font-size: 1.4rem;"></ion-icon>
+                                </button>
+                                ${spot.unavailable_reason ? `<div style="text-align: center; color: #f87171; font-size: 0.75rem; font-weight: 500;">${spot.unavailable_reason}</div>` : ''}
+                            </div>
+                        ` : isBookedByUser ? `
                             <!-- BOOKED ACTIONS -->
                             <a href="${bgImage}" target="_blank" 
                                 style="width: 52px; height: 52px; border-radius: 12px; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; color: white; transition: 0.2s; border: 1px solid rgba(255,255,255,0.2);" title="View Image">

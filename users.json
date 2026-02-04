@@ -1,0 +1,22 @@
+[
+  {
+    "id": "user_123",
+    "name": "Alex Driver",
+    "points": 197,
+    "tier": "Bronze",
+    "history": [
+      {
+        "action": "Booking",
+        "points": 55,
+        "spot": "DVLA Space",
+        "date": "2026-02-04"
+      },
+      {
+        "action": "Booking",
+        "points": 22,
+        "spot": "NaaSpace 2",
+        "date": "2026-02-04"
+      }
+    ]
+  }
+]

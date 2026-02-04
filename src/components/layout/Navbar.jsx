@@ -19,9 +19,9 @@ const Navbar = () => {
                         For Owners
                     </Link>
                     {/* User Profile */}
-                    <button className="glass-panel nav-btn" style={{ padding: '0.5rem', display: 'flex' }}>
+                    <Link to="/rewards" className="glass-panel nav-btn" style={{ padding: '0.5rem', display: 'flex' }}>
                         <User size={20} />
-                    </button>
+                    </Link>
                 </div>
             </div>
         </nav>
