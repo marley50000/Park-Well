@@ -20,44 +20,48 @@
         <!-- Logo (Big & Centered) -->
         <div style="margin-bottom: 2rem; display: flex; align-items: center; justify-content: center;">
             <img src="{{ url_for('static', filename='img/Logo.png') }}" alt="ParkingSlotAfrica Logo"
-                style="width: 250px; height: auto; animation: logoFloat 6s ease-in-out infinite;">
+                class="welcome-logo"
+                style="width: 200px; max-width: 60vw; height: auto; animation: logoFloat 6s ease-in-out infinite;">
         </div>
 
-        <h1
-            style="font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1rem; color: white; letter-spacing: -0.05em;">
+        <h1 class="welcome-title"
+            style="font-weight: 800; line-height: 1.1; margin-bottom: 1rem; color: white; letter-spacing: -0.05em; text-align: center;">
             ParkingSlot<span
                 style="background: linear-gradient(to right, #6366f1, #a855f7); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Africa.</span>
         </h1>
 
-        <p style="font-size: 1.25rem; color: #9ca3af; margin-bottom: 3rem; line-height: 1.6;">
+        <p class="welcome-text" style="color: #9ca3af; margin-bottom: 3rem; line-height: 1.6; text-align: center;">
             The smartest way to find secure parking in Accra. <br>
             <span style="color: #e5e7eb;">Real-time availability. Instant booking.</span>
         </p>
 
         <!-- CTA Buttons -->
-        <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center;">
+        <div style="display: flex; flex-direction: column; gap: 1rem; align-items: center; width: 100%;">
             <a href="/map" class="btn-primary"
-                style="padding: 1rem 3rem; font-size: 1.1rem; border-radius: 99px; width: 100%; max-width: 300px; text-decoration: none; justify-content: center; box-shadow: 0 0 20px rgba(99,102,241,0.4); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700;">
+                style="padding: 1rem; font-size: 1.1rem; border-radius: 99px; width: 100%; max-width: 300px; text-decoration: none; justify-content: center; box-shadow: 0 0 20px rgba(99,102,241,0.4); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; display:flex; align-items:center;">
                 Find a Spot <ion-icon name="arrow-forward" style="margin-left: 0.5rem;"></ion-icon>
             </a>
 
             <a href="/login"
-                style="color: #6b7280; font-size: 0.9rem; text-decoration: none; display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: 99px; transition: all 0.3s;">
-                Admin Access <ion-icon name="lock-closed-outline"></ion-icon>
+                style="color: #6b7280; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 99px; transition: all 0.3s; border: 1px solid rgba(107, 114, 128, 0.2);">
+                <ion-icon name="lock-closed-outline"></ion-icon> Admin Access
             </a>
         </div>
     </div>
 
     <!-- Feature Ticker / Footer -->
     <div
-        style="position: absolute; bottom: 0; width: 100%; padding: 2rem; background: linear-gradient(to top, #030712 20%, transparent); display: flex; justify-content: center; gap: 2rem; z-index: 10; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+        style="position: absolute; bottom: 0; width: 100%; padding: 1.5rem; background: linear-gradient(to top, #030712 40%, transparent); display: flex; justify-content: center; gap: 1.5rem; z-index: 10; flex-wrap: wrap;">
+        <div
+            style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.8rem; font-weight: 500;">
             <ion-icon name="time-outline" style="color: #6366f1;"></ion-icon> Live Updates
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+        <div
+            style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.8rem; font-weight: 500;">
             <ion-icon name="shield-checkmark-outline" style="color: #10b981;"></ion-icon> Secure Payment
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem;">
+        <div
+            style="display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.8rem; font-weight: 500;">
             <ion-icon name="navigate-outline" style="color: #f59e0b;"></ion-icon> GPS Navigation
         </div>
     </div>
@@ -65,7 +69,25 @@
 </div>
 
 <style>
-    @keyframes float {
+    .welcome-title {
+        font-size: 3.5rem;
+    }
+
+    .welcome-text {
+        font-size: 1.25rem;
+    }
+
+    @media (max-width: 600px) {
+        .welcome-title {
+            font-size: 2.5rem;
+        }
+
+        .welcome-text {
+            font-size: 1rem;
+        }
+    }
+
+    <style>@keyframes float {
 
         0%,
         100% {

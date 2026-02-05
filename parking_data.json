@@ -57,7 +57,7 @@
   },
   {
     "name": "Shell Filling Station - Park",
-    "price": 20.0,
+    "price": 0.5,
     "available": 10,
     "lat": 5.576404,
     "lng": -0.152725,
@@ -67,12 +67,16 @@
     "id": 16,
     "distance": "0.5 km",
     "trust_level": 3,
-    "qr_code_id": "PW-FDC296C2"
+    "qr_code_id": "PW-FDC296C2",
+    "unavailable_dates": [],
+    "unavailable_days": [],
+    "unavailable_reason": "",
+    "amenities": []
   },
   {
     "name": "NaaSpace",
     "price": 12.0,
-    "available": 12,
+    "available": 14,
     "lat": 5.571502,
     "lng": -0.141728,
     "image_url": "https://lh3.googleusercontent.com/gps-cs-s/AHVAwergGe1f3MwTKhwefqQKsCA0pAUGfrMYq1Uj9DZE0NcDt3GhyAxdkBTV8EcSAiv7bWtxU5AH3UEnpuS0YQxV2OoXlygmoPsFCauUpgqSFWYgH7ajsv4rcyeXSGA_1Z1SIvI0u7Y=s680-w680-h510-rw",

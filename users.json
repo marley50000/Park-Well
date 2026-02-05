@@ -2,7 +2,7 @@
   {
     "id": "user_123",
     "name": "Alex Driver",
-    "points": 227,
+    "points": 237,
     "tier": "Silver",
     "history": [
       {
@@ -22,7 +22,19 @@
         "points": 30,
         "spot": "Shell Filling Station - Park",
         "date": "2026-02-04"
+      },
+      {
+        "action": "Booking",
+        "points": 10,
+        "spot": "Shell Filling Station - Park",
+        "date": "2026-02-05"
+      },
+      {
+        "action": "Deposit",
+        "amount": 1.0,
+        "date": "2026-02-05"
       }
-    ]
+    ],
+    "wallet_balance": 1.0
   }
 ]

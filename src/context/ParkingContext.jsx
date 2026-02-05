@@ -59,14 +59,32 @@ export const ParkingProvider = ({ children }) => {
         }
     };
 
-    const reserveSpot = async (id) => {
+    const reserveSpot = async (id, paymentReference = null, bookingDetails = {}) => {
         // Placeholder for reserve logic contacting API
-        // For now just update local state to match UI expectation until we fully wire it up
         try {
-            await fetch(`/api/reserve/${id}`, { method: 'POST', body: '{}', headers: { 'Content-Type': 'application/json' } });
-            setSpots(spots.map(s => s.id === id && s.available > 0 ? { ...s, available: s.available - 1 } : s));
+            const body = {
+                ...bookingDetails,
+                payment_reference: paymentReference
+            };
+
+            const res = await fetch(`/api/reserve/${id}`, {
+                method: 'POST',
+                body: JSON.stringify(body),
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.success) {
+                setSpots(spots.map(s => s.id === id && s.available > 0 ? { ...s, available: s.available - 1 } : s));
+                return { success: true };
+            } else {
+                console.error("Reserve failed:", data.message);
+                return { success: false, message: data.message };
+            }
         } catch (error) {
             console.error("Reserve failed", error);
+            return { success: false, message: "Network error" };
         }
     };
 

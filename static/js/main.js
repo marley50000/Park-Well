@@ -41,38 +41,80 @@ document.addEventListener('DOMContentLoaded', () => {
             navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
+                    let heading = position.coords.heading;
+
                     userLocation = { lat: latitude, lng: longitude };
 
                     // Update or Add User Marker
                     if (userMarker) {
                         userMarker.setLatLng([latitude, longitude]);
+
+                        // Rotated Marker for clearer direction
+                        if (heading) {
+                            // If we have a heading, interact with it?
+                            // For now, marker remains a dot.
+                        }
                     } else {
                         userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map);
                         userMarker.bindPopup("You are here");
-                        // Only center initially if no marker existed
-                        map.setView([latitude, longitude], 14);
-                        fetchSpots(); // Initial fetch
+                        map.setView([latitude, longitude], 17); // Closer zoom for nav
+                        fetchSpots();
                     }
 
-                    // Follow Mode if Navigating
-                    if (isNavigating && navTargetSpot) {
-                        map.setView([latitude, longitude], 16);
-
-                        // Optional: Update distance on card
-                        const dist = getDistanceFromLatLonInKm(latitude, longitude, navTargetSpot.lat, navTargetSpot.lng);
-                        document.getElementById('navDistance').innerText = dist.toFixed(1) + ' km to your destination';
+                    // FOLLOW MODE & HEADING CORRECTION
+                    if (isNavigating || !window.hasInteracted) {
+                        map.setView([latitude, longitude], map.getZoom());
                     }
+
+                    // CARDINAL ORIENTATION (Heads Up Display)
+                    // "Turn it the opposite way" -> We interpret this as rotating the map 
+                    // so the road ahead is UP on the screen.
+                    if (heading) {
+                        // Standard: Rotate map NEGATIVE heading.
+                        // User request "Opposite": Maybe they want POSITIVE? 
+                        // Let's stick to standard Heads-Up first (Rotate map so North aligns with Phone North)
+                        const rotateZ = -heading;
+                        document.getElementById('map').style.transform = `rotate(${rotateZ}deg) scale(1.5)`;
+                        // Scale 1.5 needed to cover corners when rotated
+
+                        // Counter-rotate icons so they stay upright? 
+                        // (Optional, keeps text readable)
+                        document.querySelectorAll('.leaflet-marker-icon, .leaflet-popup-content-wrapper').forEach(el => {
+                            el.style.transform = `rotate(${-rotateZ}deg)`;
+                        });
+                    }
+
                 },
-                (error) => {
-                    console.error("Error watching location:", error);
-                    // Don't alert repeatedly in watchPosition, but maybe show a visual indicator if critical
-                },
-                {
-                    enableHighAccuracy: true,
-                    maximumAge: 0,
-                    timeout: 30000
-                }
+                (error) => console.error("Location Error:", error),
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
             );
+
+            // COMPASS FALLBACK (for devices without GPS heading but with Magnetometer)
+            window.addEventListener('deviceorientation', (e) => {
+                if (!userLocation) return;
+
+                // Use compass heading if GPS heading unavailable or slow
+                let compass = e.webkitCompassHeading || Math.abs(e.alpha - 360);
+
+                if (compass) {
+                    // Smooth rotation could go here, but direct setting for responsiveness:
+                    // We interpret "Opposite" as maybe the user holding phone naturally?
+                    // Let's just align Map Up = Real World Forward.
+                    const rotateZ = -compass;
+                    document.getElementById('map').style.transition = 'transform 0.2s linear';
+                    document.getElementById('map').style.transform = `rotate(${rotateZ}deg) scale(1.5)`;
+
+                    // Keep UI/Icons Upright
+                    document.querySelectorAll('.leaflet-marker-icon').forEach(el => {
+                        el.style.transform += ` rotate(${compass}deg)`;
+                        // Note: additive transform on markers is tricky in Leaflet without clearing basic transform. 
+                        // Simplification: Let's rotate the whole container. Markers will rotate WITH map (World Fixed).
+                        // This is actually CORRECT for a map.
+                        // The User Marker should probably stay fixed "Up" is redundant if map moves.
+                    });
+                }
+            });
+
         } else {
             alert("Geolocation is not supported by your browser.");
             fetchSpots();
@@ -82,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const socket = io();
         socket.on('data_update', (msg) => {
             console.log("Live update:", msg);
-            fetchSpots(); // Refresh markers instantly
+            fetchSpots();
         });
     }
 
@@ -715,18 +757,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- WALLET SYSTEM ---
     const DEPOSIT_AMOUNT = 20.00; // Advance Hold
+    let realUserBalance = 0.0;
 
     function initWallet() {
-        let balance = localStorage.getItem('userWalletBalance');
-        if (!balance) {
-            balance = 50.00; // Free money for demo
-            localStorage.setItem('userWalletBalance', balance);
-        }
-        updateWalletUI(balance);
+        console.log("Fetching real wallet balance...");
+        fetch('/api/user/profile')
+            .then(r => r.json())
+            .then(user => {
+                realUserBalance = user.wallet_balance || 0.0;
+                updateWalletUI(realUserBalance);
+            })
+            .catch(err => {
+                console.error("Wallet fetch error", err);
+                // Fallback to local if offline? No, strictly server now.
+                updateWalletUI(0.00);
+            });
     }
 
     function updateWalletUI(balance) {
-        if (balance === undefined) balance = localStorage.getItem('userWalletBalance');
         const el = document.getElementById('userWallet');
         if (el) el.innerText = 'GH₵ ' + parseFloat(balance).toFixed(2);
     }
@@ -740,6 +788,9 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSpotRate = price;
         updateBookingPrice(); // Init with 1 hour
         bookingModal.classList.remove('hidden');
+
+        // Refresh balance when opening modal to be sure
+        initWallet();
     };
 
     window.updateBookingPrice = () => {
@@ -787,7 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.closeBookingModal = () => bookingModal.classList.add('hidden');
 
     // Handle Reservation
-    document.getElementById('bookingForm').addEventListener('submit', (e) => {
+    document.getElementById('bookingForm').addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const formData = new FormData(e.target);
@@ -808,14 +859,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const baseAmount = currentSpotRate * duration;
         const totalCharge = baseAmount + DEPOSIT_AMOUNT;
 
-        let wallet = parseFloat(localStorage.getItem('userWalletBalance'));
-        // If wallet implementation not found, init it 
-        if (isNaN(wallet)) { wallet = 50.00; localStorage.setItem('userWalletBalance', wallet); }
-
-        if (wallet < totalCharge) {
-            alert(`Insufficient Balance!\n\nWallet: GH₵ ${wallet.toFixed(2)}\nRequired: GH₵ ${totalCharge.toFixed(2)}\n(Includes GH₵ ${DEPOSIT_AMOUNT} deposit)`);
-            return;
-        }
+        // Ensure we have the latest balance before deciding
+        try {
+            const res = await fetch('/api/user/profile');
+            const data = await res.json();
+            realUserBalance = data.wallet_balance || 0.0;
+            updateWalletUI(realUserBalance);
+        } catch (err) { console.error(err); }
 
         const bookingData = {
             user_name: formData.get('user_name'),
@@ -830,92 +880,158 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Mock backend call success for UI demo (since payment is manual)
-        // In real app, we'd send to backend here. For now, we simulate success to show the enforcement features.
+        // --- PAYMENT SELECTION LOGIC ---
+        let useWallet = false;
 
-        fetch(`/api/reserve/${spotId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingData)
-        })
-            .then(async r => {
-                if (!r.ok) {
-                    const text = await r.text();
-                    throw new Error(text || `Server Error: ${r.status}`);
-                }
-                return r.json();
+        if (realUserBalance >= totalCharge) {
+            // Offer Wallet Payment
+            if (confirm(`Pay GH₵ ${totalCharge.toFixed(2)} using your Wallet?\n\nCurrent Balance: GH₵ ${realUserBalance.toFixed(2)}`)) {
+                useWallet = true;
+            }
+        } else {
+            // Note: Could alert here that they need to top up or just fall through to card
+            // console.log("Insufficient wallet for full charge, falling back to Paystack");
+        }
+
+        if (useWallet) {
+            // --- WALLET PAYMENT FLOW ---
+            bookingData.payment_method = 'wallet';
+
+            fetch(`/api/reserve/${spotId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(bookingData)
             })
-            .then(res => {
-                if (res.success) {
-                    closeBookingModal();
+                .then(r => r.json())
+                .then(res => {
+                    if (res.success) {
+                        closeBookingModal();
 
-                    // Show Payment Instructions
-                    const payModal = document.getElementById('paymentModal');
-                    document.getElementById('payAmount').innerText = document.getElementById('bookingPrice').innerText;
-                    document.getElementById('payRef').innerText = bookingData.vehicle_plate.toUpperCase();
-                    payModal.classList.remove('hidden');
-
-                    // Define finish callback
-                    window.finishPayment = () => {
-                        // DEDUCT WALLET
-                        let wallet = parseFloat(localStorage.getItem('userWalletBalance'));
-                        // Ensure it exists
-                        if (isNaN(wallet)) wallet = 50.00;
-
-                        wallet -= totalCharge;
-                        localStorage.setItem('userWalletBalance', wallet);
-                        updateWalletUI(wallet);
-
-                        alert(`✅ Payment Successful\n\nPaid: GH₵ ${bookingData.amount.toFixed(2)}\nHeld: GH₵ ${DEPOSIT_AMOUNT.toFixed(2)}`);
-
-                        // 1. SAVE SESSION DATA
-                        const parkedSpot = allSpots.find(s => s.id == spotId);
-                        const startTime = Date.now();
-                        const expiryTime = startTime + (duration * 60 * 60 * 1000);
-
-                        // Just for testing, let's make 1 hour = 1 minute so user can see it expire fast?
-                        // Uncomment next line for DEMO MODE (1 Hour = 60 Seconds)
-                        // const expiryTime = startTime + (duration * 60 * 1000); 
-
-                        const sessionData = {
-                            depositHeld: DEPOSIT_AMOUNT,
-                            spotId: spotId,
-                            lat: parkedSpot ? parkedSpot.lat : 0,
-                            lng: parkedSpot ? parkedSpot.lng : 0,
-                            name: parkedSpot ? parkedSpot.name : 'Unknown Spot',
-                            startTime: startTime,
-                            expiryTime: expiryTime,
-                            plate: bookingData.vehicle_plate
-                        };
-
-                        localStorage.setItem('activeSession', JSON.stringify(sessionData));
-
-                        // 2. Hide Payment Modal
-                        payModal.classList.add('hidden');
-
-                        // 3. Start Enforcer
-                        startSessionMonitor();
-
-                        // 4. AUTO-START NAVIGATION
-                        if (parkedSpot) {
-                            startAppNavigation({
-                                lat: parkedSpot.lat,
-                                lng: parkedSpot.lng,
-                                name: parkedSpot.name
-                            });
+                        // Update UI immediately
+                        if (res.new_balance !== undefined) {
+                            realUserBalance = res.new_balance;
+                            updateWalletUI(realUserBalance);
+                        } else {
+                            // Fallback manual update
+                            initWallet();
                         }
 
-                        alert("Payment Verified! Navigation Started.");
+                        alert(`✅ WALLET PAYMENT SUCCESSFUL!\n\nReference: ${res.transaction_id || 'WAL-' + Date.now()}`);
+
+                        // Trigger Success Logic (Session Start)
+                        startSessionSuccess(spotId, duration, bookingData.vehicle_plate, res.transaction_id || 'WALLET', DEPOSIT_AMOUNT);
+
+                    } else {
+                        alert("Wallet Payment Failed: " + res.message);
                     }
-                } else {
-                    alert("Booking Failed: " + res.message);
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                alert("System Error: " + err.message);
-            });
+                })
+                .catch(err => alert("System Error: " + err.message));
+
+            return; // EXIT HERE
+        }
+
+        // --- PAYSTACK PAYMENT FLOW (Fallback) ---
+        const paystackKey = window.PAYSTACK_PUBLIC_KEY;
+        if (!paystackKey || paystackKey.includes('placeholder')) {
+            alert("Configuration Error: Paystack Public Key not set.");
+            return;
+        }
+
+        const handler = PaystackPop.setup({
+            key: paystackKey,
+            email: window.USER_EMAIL || "guest@parkwell.com",
+            amount: Math.ceil(totalCharge * 100), // Amount in kobo
+            currency: 'GHS', // Adjust if needed
+            metadata: {
+                custom_fields: [
+                    { display_name: "Spot ID", variable_name: "spot_id", value: spotId },
+                    { display_name: "Plate", variable_name: "plate", value: bookingData.vehicle_plate }
+                ]
+            },
+            callback: function (response) {
+                console.log("Paystack Success:", response);
+
+                // Add reference to payload
+                bookingData.payment_reference = response.reference;
+                bookingData.payment_method = 'paystack';
+
+                // Call Backend
+                fetch(`/api/reserve/${spotId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bookingData)
+                })
+                    .then(async r => {
+                        if (!r.ok) {
+                            const text = await r.text();
+                            throw new Error(text || `Server Error: ${r.status}`);
+                        }
+                        return r.json();
+                    })
+                    .then(res => {
+                        if (res.success) {
+                            closeBookingModal();
+                            alert(`✅ Reservation Confirmed!\n\nReference: ${response.reference}`);
+
+                            // Trigger Success Logic
+                            startSessionSuccess(spotId, duration, bookingData.vehicle_plate, response.reference, DEPOSIT_AMOUNT);
+
+                        } else {
+                            alert("Booking Failed: " + res.message);
+                        }
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("System Error: " + err.message);
+                    });
+            },
+            onClose: function () {
+                alert('Transaction was not completed.');
+            }
+        });
+
+        handler.openIframe();
     });
+
+    // Separated Success Logic to avoid duplication
+    function startSessionSuccess(spotId, duration, plate, ref, depositInfo) {
+        // 1. SAVE SESSION DATA
+        // We need to find the spot object again (inefficient but safe)
+        fetch('/api/spots').then(r => r.json()).then(latestSpots => {
+            const parkedSpot = latestSpots.find(s => s.id == spotId);
+            const startTime = Date.now();
+            const expiryTime = startTime + (duration * 60 * 60 * 1000);
+
+            const sessionData = {
+                depositHeld: depositInfo,
+                spotId: spotId,
+                lat: parkedSpot ? parkedSpot.lat : 0,
+                lng: parkedSpot ? parkedSpot.lng : 0,
+                name: parkedSpot ? parkedSpot.name : 'Unknown Spot',
+                startTime: startTime,
+                expiryTime: expiryTime,
+                plate: plate,
+                paymentRef: ref
+            };
+
+            localStorage.setItem('activeSession', JSON.stringify(sessionData));
+
+            // 3. Start Enforcer
+            startSessionMonitor();
+
+            // 4. AUTO-START NAVIGATION
+            if (parkedSpot) {
+                // Refresh Map UI to show "Booked" icon
+                renderSpots(latestSpots);
+
+                startAppNavigation({
+                    lat: parkedSpot.lat,
+                    lng: parkedSpot.lng,
+                    name: parkedSpot.name
+                });
+            }
+        });
+    }
 
     window.reserveSpot = (id, price) => {
         openBookingModal(id, price);

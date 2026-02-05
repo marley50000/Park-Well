@@ -3,30 +3,49 @@
 {% block content %}
 <div class="home-container">
     <!-- Navbar -->
-    <nav class="navbar">
-        <div class="navbar-inner">
-            <a href="/" style="text-decoration: none;">
-                <div
-                    style="display: flex; gap: 0.5rem; align-items: center; background: rgba(17,24,39,0.5); padding: 0.5rem 1rem; border-radius: 99px;">
-                    <img src="{{ url_for('static', filename='img/Logo.png') }}" alt="ParkingSlotAfrica Logo"
-                        style="height: 32px; width: auto;">
-                </div>
-            </a>
+    <!-- Navbar -->
+    <nav class="navbar"
+        style="position: absolute; top: 0; left: 0; right: 0; z-index: 1000; padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; pointer-events: none;">
 
-            <!-- Wallet Balance -->
-            <div
-                style="background: rgba(255,255,255,0.1); padding: 6px 14px; border-radius: 99px; display: flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1); margin-right: 1rem;">
-                <ion-icon name="wallet" style="color: #10b981;"></ion-icon>
-                <div style="display: flex; flex-direction: column; line-height: 1;">
+        <!-- Logo Area -->
+        <a href="/" style="text-decoration: none; pointer-events: auto;">
+            <div class="glass-pill"
+                style="display: flex; gap: 0.75rem; align-items: center; background: rgba(17, 24, 39, 0.8); backdrop-filter: blur(12px); padding: 0.5rem 1rem; border-radius: 99px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+                <img src="{{ url_for('static', filename='img/Logo.png') }}" alt="Logo"
+                    style="height: 36px; width: auto;">
+                <span
+                    style="color: white; font-weight: 700; font-size: 1rem; letter-spacing: -0.02em; display: none; @media(min-width: 400px){display: inline;}">ParkingSlot<span
+                        style="color: #818cf8;">.</span></span>
+            </div>
+        </a>
+
+        <!-- Right Side Controls -->
+        <div style="display: flex; gap: 0.75rem; align-items: center; pointer-events: auto;">
+
+            <!-- Wallet Badge -->
+            <div class="glass-pill"
+                style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.5rem 1rem; border-radius: 99px; display: flex; align-items: center; gap: 0.6rem; backdrop-filter: blur(8px);">
+                <div
+                    style="background: #10b981; color: black; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">
+                    <ion-icon name="wallet"></ion-icon>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: center; line-height: 1.1;">
                     <span
-                        style="font-size: 0.65rem; color: #9ca3af; text-transform: uppercase; font-weight: 700;">Balance</span>
-                    <span style="font-weight: 700; color: white; font-size: 0.9rem;" id="userWallet">GH₵ 0.00</span>
+                        style="font-size: 0.6rem; color: #6ee7b7; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">BALANCE</span>
+                    <span
+                        style="font-weight: 800; color: white; font-size: 0.95rem; font-variant-numeric: tabular-nums;"
+                        id="userWallet">GH₵ 0.00</span>
                 </div>
             </div>
 
-            <a href="/dashboard" class="glass-panel"
-                style="padding: 0.5rem 1rem; border-radius: 0.75rem; color: white; font-weight: 500; font-size: 0.875rem; display: flex; align-items: center; gap: 0.5rem;">
-                My Account <ion-icon name="arrow-forward"></ion-icon>
+            <!-- Profile / Dashboard Link -->
+            <a href="/dashboard" class="glass-pill"
+                style="background: white; color: black; padding: 0.5rem 0.5rem 0.5rem 1rem; border-radius: 99px; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; font-weight: 700; font-size: 0.9rem; box-shadow: 0 0 20px rgba(255,255,255,0.2);">
+                <span style="display: none; @media(min-width: 480px){display: inline;}">My Account</span>
+                <div
+                    style="width: 32px; height: 32px; background: #000; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                    <ion-icon name="person"></ion-icon>
+                </div>
             </a>
         </div>
     </nav>
@@ -181,5 +200,10 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<script>
+    window.PAYSTACK_PUBLIC_KEY = "{{ paystack_key }}";
+    window.USER_EMAIL = "guest@example.com"; // Default email, can be updated dynamically
+</script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

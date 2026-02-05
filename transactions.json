@@ -376,5 +376,26 @@
     "user_name": "Spark Marley",
     "vehicle_plate": "F3F3F",
     "timestamp": 1770229616.0413058
+  },
+  {
+    "id": 1770310251824,
+    "spot_id": 16,
+    "spot_name": "Shell Filling Station - Park",
+    "price": 0.5,
+    "type": "Booking",
+    "payment_method": "paystack",
+    "user_name": "Teest 1",
+    "vehicle_plate": "Gwc-vild",
+    "timestamp": 1770310251.8245378,
+    "payment_ref": "T262751068598969"
+  },
+  {
+    "id": 1770313777049,
+    "type": "Deposit",
+    "amount": 1.0,
+    "user_name": "Alex Driver",
+    "payment_ref": "170021011",
+    "timestamp": 1770313777.0497575,
+    "date": "2026-02-05"
   }
 ]

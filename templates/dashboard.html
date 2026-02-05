@@ -62,9 +62,11 @@
             <div style="display: flex; align-items: center; gap: 1rem;">
                 <!-- Login Check Logic for Display -->
                 {% if is_admin %}
-                <span style="color: #f59e0b; font-weight: 600;">Admin Mode Active</span>
+                <span class="admin-badge"
+                    style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.2);">ADMIN</span>
                 {% else %}
-                <span style="color: #9ca3af;">Welcome, Driver</span>
+                <span style="color: #9ca3af; display: none; @media(min-width: 768px){display:inline;}">Welcome,
+                    Driver</span>
                 {% endif %}
 
                 <div
@@ -410,42 +412,103 @@
     </div>
 </div>
 
+<script src="https://js.paystack.co/v1/inline.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // --- USER DASHBOARD LOGIC ---
 
+    const PAYSTACK_PUBLIC_KEY = "{{ paystack_key }}";
+
     // Init Dashboard
     document.addEventListener('DOMContentLoaded', () => {
-        updateWalletDisplay();
-        renderVehicleList();
-        updateStatusDisplay();
-        renderTransactionList();
+        fetchUserData();
 
         // Auto-load admin spots if tab is somehow active or for preload
         // fetchAdminSpots(); // Only fetch if admin tab is active to save resources? 
         // For now, let's just leave it lazy loaded on tab switch.
 
         // Check URL or storage to allow persisting tab state?
+        updateStatusDisplay(); // Keep existing local logic for session timer for now or update it
     });
 
-    function updateWalletDisplay() {
-        const bal = parseFloat(localStorage.getItem('userWalletBalance')) || 0;
-        document.getElementById('dashWalletBalance').innerText = 'GH₵ ' + bal.toFixed(2);
+    function fetchUserData() {
+        console.log("Fetching user profile...");
+        fetch('/api/user/profile')
+            .then(res => res.json())
+            .then(user => {
+                // Update Balance
+                document.getElementById('dashWalletBalance').innerText = 'GH₵ ' + (user.wallet_balance || 0).toFixed(2);
+
+                // Update History
+                const list = document.getElementById('transactionList');
+                if (!user.history || user.history.length === 0) {
+                    list.innerHTML = `<li style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); color: #9ca3af; text-align: center;">No recent transactions</li>`;
+                } else {
+                    // Show last 5
+                    const recent = user.history.slice().reverse().slice(0, 5);
+                    list.innerHTML = recent.map(t => {
+                        const isDeposit = t.action === 'Deposit';
+                        const color = isDeposit ? '#10b981' : '#ef4444';
+                        const sign = isDeposit ? '+' : '-';
+                        return `
+                        <li style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-weight: 600; font-size: 0.9rem;">${t.action} ${t.spot ? '- ' + t.spot : ''}</div>
+                                <div style="font-size: 0.75rem; color: #9ca3af;">${t.date}</div>
+                            </div>
+                            <div style="font-weight: 700; color: ${color};">
+                                ${sign} GH₵ ${Math.abs(t.amount || t.points).toFixed(2)}
+                            </div>
+                        </li>
+                        `;
+                    }).join('');
+                }
+
+                // Update Stats
+                document.getElementById('userTotalBookings').innerText = user.history.filter(h => h.action === 'Booking').length;
+
+                renderVehicleList(); // Still using localStorage for vehicles for now? Or should we move that too? Keeping local for now as per minimal changes.
+            })
+            .catch(err => console.error("Error loading profile:", err));
     }
 
     function topUpWallet() {
-        // Mock Top Up
-        const amount = prompt("Enter Top Up Amount (GHS):", "50");
-        if (amount && !isNaN(amount)) {
-            let bal = parseFloat(localStorage.getItem('userWalletBalance')) || 0;
-            bal += parseFloat(amount);
-            localStorage.setItem('userWalletBalance', bal);
-            updateWalletDisplay();
+        const amountStr = prompt("Enter Top Up Amount (GHS):", "50");
+        if (!amountStr || isNaN(amountStr)) return;
 
-            // Log Transaction
-            logTransaction('Deposit', parseFloat(amount));
-            alert("✅ Wallet Top Up Successful!");
-        }
+        const amount = parseFloat(amountStr);
+        if (amount <= 0) return;
+
+        const handler = PaystackPop.setup({
+            key: PAYSTACK_PUBLIC_KEY,
+            email: 'user@example.com', // Demo Email
+            amount: amount * 100, // Kobo
+            currency: 'GHS',
+            ref: '' + Math.floor((Math.random() * 1000000000) + 1), // Generate a random reference
+            onClose: function () {
+                alert('Window closed.');
+            },
+            callback: function (response) {
+                // Verify on backend
+                fetch('/api/user/topup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reference: response.reference })
+                })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            fetchUserData(); // Refresh UI
+                        } else {
+                            alert('Top up failed: ' + data.message);
+                        }
+                    })
+                    .catch(err => alert("Network error"));
+            }
+        });
+
+        handler.openIframe();
     }
 
     // Vehicle Management

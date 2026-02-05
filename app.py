@@ -7,6 +7,9 @@ from functools import wraps
 from flask_socketio import SocketIO, emit
 import uuid
 import copy
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Undo/Redo Stacks ---
 UNDO_STACK = []
@@ -53,6 +56,7 @@ except:
         'name': 'Alex Driver', 
         'points': 120, 
         'tier': 'Bronze',
+        'wallet_balance': 0.00,
         'history': []
     }]
 
@@ -144,7 +148,8 @@ def home():
 
 @app.route('/map')
 def map_view():
-    return render_template('index.html')
+    pk = os.environ.get('VITE_PAYSTACK_PUBLIC_KEY', 'pk_test_placeholder')
+    return render_template('index.html', paystack_key=pk)
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -166,13 +171,16 @@ def logout():
 @app.route('/dashboard')
 def dashboard():
     # Public/User Dashboard (Always show user view, never admin controls)
-    return render_template('dashboard.html', is_admin=False)
+    # Pass public key for wallet topup
+    pk = os.environ.get('VITE_PAYSTACK_PUBLIC_KEY', 'pk_test_placeholder')
+    return render_template('dashboard.html', is_admin=False, paystack_key=pk)
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
     if 'admin' not in session:
         return redirect(url_for('login'))
-    return render_template('dashboard.html', is_admin=True)
+    pk = os.environ.get('VITE_PAYSTACK_PUBLIC_KEY', 'pk_test_placeholder')
+    return render_template('dashboard.html', is_admin=True, paystack_key=pk)
 
 # --- API ---
 @app.route('/api/spots', methods=['GET'])
@@ -316,11 +324,134 @@ def delete_spot(spot_id):
     
     return jsonify({'success': True})
 
+import requests
+import os
+
+# Paystack Config
+PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY')
+
+def verify_paystack_transaction(reference):
+    """
+    Verifies a Paystack transaction.
+    Returns the transaction 'data' object on success, or False/None on failure.
+    The data object contains 'amount' (in kobo), 'status', 'reference', etc.
+    """
+    if not reference: 
+        return False
+    
+    url = f"https://api.paystack.co/transaction/verify/{reference}"
+    headers = {
+        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data['status'] == True and data['data']['status'] == 'success':
+                return data['data'] # Return full data
+    except Exception as e:
+        print(f"Paystack verification error: {e}")
+        
+    return False
+
+@app.route('/api/user/topup', methods=['POST'])
+def topup_wallet():
+    """Secure wallet top-up via Paystack"""
+    data = request.json
+    reference = data.get('reference')
+    
+    if not reference:
+        return jsonify({'success': False, 'message': 'Reference required'}), 400
+        
+    # Check if reference already used in transactions (prevent replay attack)
+    transactions = load_transactions()
+    if any(t.get('payment_ref') == reference for t in transactions):
+         return jsonify({'success': False, 'message': 'Transaction reference already used'}), 400
+         
+    # Verify with Paystack
+    txn_data = verify_paystack_transaction(reference)
+    if not txn_data:
+        return jsonify({'success': False, 'message': 'Payment verification failed'}), 400
+        
+    # Get amount confirmed by Paystack (in kobo, convert to GHS)
+    amount_paid = float(txn_data['amount']) / 100.0
+    
+    # Update User Balance
+    users = load_users()
+    user = users[0] # Demo User
+    
+    user['wallet_balance'] = user.get('wallet_balance', 0.0) + amount_paid
+    
+    # Log Transaction
+    txn = {
+        'id': int(time.time() * 1000),
+        'type': 'Deposit',
+        'amount': amount_paid,
+        'user_name': user['name'],
+        'payment_ref': reference,
+        'timestamp': time.time(),
+        'date': time.strftime("%Y-%m-%d") 
+    }
+    
+    # Update History
+    user['history'].append({
+        'action': 'Deposit',
+        'amount': amount_paid,
+        'date': time.strftime("%Y-%m-%d")
+    })
+    
+    save_users(users)
+    save_transaction(txn)
+    
+    return jsonify({
+        'success': True, 
+        'new_balance': user['wallet_balance'],
+        'message': f'Wallet funded with GH₵ {amount_paid}'
+    })
+
 @app.route('/api/reserve/<int:spot_id>', methods=['POST'])
 def reserve_spot(spot_id):
     data = load_data()
     booking_info = request.json or {}
+    print(f"DEBUG EXPLICIT: booking_info received: {booking_info}") # DEBUG
     
+    payment_method = booking_info.get('payment_method', 'paystack')
+    payment_reference = booking_info.get('payment_reference')
+    
+    # --- Payment Processing ---
+    if payment_method == 'wallet':
+        users = load_users()
+        user = users[0]
+        spot = next((s for s in data if s['id'] == spot_id), None)
+        
+        if not spot: return jsonify({'message': 'Spot not found'}), 404
+        
+        current_balance = user.get('wallet_balance', 0.0)
+        if current_balance < spot['price']:
+             return jsonify({'success': False, 'message': 'Insufficient wallet balance. Please top up.'}), 400
+             
+        # Deduct
+        user['wallet_balance'] -= spot['price']
+        save_users(users) # Save immediately to lock funds
+        
+        payment_reference = f"WALLET-{int(time.time())}" # Internal Ref
+        
+    else:
+        # Paystack (Direct)
+        should_verify = True
+        if not PAYSTACK_SECRET_KEY or 'sk_test_YOUR_SECRET_KEY_HERE' in PAYSTACK_SECRET_KEY:
+            should_verify = False
+            print("DEBUG: Skipping payment verification (Key not set or placeholder)")
+            
+        if should_verify:
+             if not payment_reference:
+                 return jsonify({'success': False, 'message': 'Payment reference required'}), 400
+             
+             if not verify_paystack_transaction(payment_reference):
+                 return jsonify({'success': False, 'message': 'Payment verification failed'}), 400
+
     for spot in data:
         if spot['id'] == spot_id:
             if spot['available'] > 0:
@@ -333,9 +464,12 @@ def reserve_spot(spot_id):
                     'spot_id': spot_id,
                     'spot_name': spot['name'],
                     'price': spot['price'],
+                    'type': 'Booking', # Added type
+                    'payment_method': payment_method,
                     'user_name': booking_info.get('user_name', 'Walk-in Customer'),
                     'vehicle_plate': booking_info.get('vehicle_plate', 'Unknown'),
-                    'timestamp': time.time()
+                    'timestamp': time.time(),
+                    'payment_ref': payment_reference
                 }
                 save_transaction(txn)
                 
@@ -347,7 +481,8 @@ def reserve_spot(spot_id):
                     'vehicle_plate': booking_info.get('vehicle_plate', 'Unknown'),
                     'start_time': time.time(),
                     'expiry_time': time.time() + (duration * 3600), # Hours to seconds
-                    'price': spot['price']
+                    'price': spot['price'],
+                    'payment_ref': payment_reference
                 }
                 save_session(session_obj)
 
@@ -375,7 +510,8 @@ def reserve_spot(spot_id):
                 return jsonify({
                     'success': True, 
                     'available': spot['available'],
-                    'transaction_id': txn['id']
+                    'transaction_id': txn['id'],
+                    'new_balance': user.get('wallet_balance', 0) if payment_method == 'wallet' else None
                 })
             else:
                 return jsonify({'success': False, 'message': 'Spot full'}), 400
