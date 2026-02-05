@@ -31,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 1. Initialize & Watch User
     // 1. Initialize & Watch User
+    // 1. Initialize & Watch User
     function init() {
         // Secure Context Warning
         if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
@@ -41,79 +42,34 @@ document.addEventListener('DOMContentLoaded', () => {
             navigator.geolocation.watchPosition(
                 (position) => {
                     const { latitude, longitude } = position.coords;
-                    let heading = position.coords.heading;
 
                     userLocation = { lat: latitude, lng: longitude };
 
                     // Update or Add User Marker
                     if (userMarker) {
                         userMarker.setLatLng([latitude, longitude]);
-
-                        // Rotated Marker for clearer direction
-                        if (heading) {
-                            // If we have a heading, interact with it?
-                            // For now, marker remains a dot.
-                        }
                     } else {
                         userMarker = L.marker([latitude, longitude], { icon: userIcon }).addTo(map);
                         userMarker.bindPopup("You are here");
                         map.setView([latitude, longitude], 17); // Closer zoom for nav
-                        fetchSpots();
+                        fetchSpots(); // Initial fetch
                     }
 
-                    // FOLLOW MODE & HEADING CORRECTION
+                    // FOLLOW MODE 
                     if (isNavigating || !window.hasInteracted) {
                         map.setView([latitude, longitude], map.getZoom());
                     }
 
-                    // CARDINAL ORIENTATION (Heads Up Display)
-                    // "Turn it the opposite way" -> We interpret this as rotating the map 
-                    // so the road ahead is UP on the screen.
-                    if (heading) {
-                        // Standard: Rotate map NEGATIVE heading.
-                        // User request "Opposite": Maybe they want POSITIVE? 
-                        // Let's stick to standard Heads-Up first (Rotate map so North aligns with Phone North)
-                        const rotateZ = -heading;
-                        document.getElementById('map').style.transform = `rotate(${rotateZ}deg) scale(1.5)`;
-                        // Scale 1.5 needed to cover corners when rotated
-
-                        // Counter-rotate icons so they stay upright? 
-                        // (Optional, keeps text readable)
-                        document.querySelectorAll('.leaflet-marker-icon, .leaflet-popup-content-wrapper').forEach(el => {
-                            el.style.transform = `rotate(${-rotateZ}deg)`;
-                        });
-                    }
+                    // Reset any rotation just in case
+                    document.getElementById('map').style.transform = 'none';
+                    document.getElementById('map').style.transition = 'none';
 
                 },
                 (error) => console.error("Location Error:", error),
                 { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
             );
 
-            // COMPASS FALLBACK (for devices without GPS heading but with Magnetometer)
-            window.addEventListener('deviceorientation', (e) => {
-                if (!userLocation) return;
-
-                // Use compass heading if GPS heading unavailable or slow
-                let compass = e.webkitCompassHeading || Math.abs(e.alpha - 360);
-
-                if (compass) {
-                    // Smooth rotation could go here, but direct setting for responsiveness:
-                    // We interpret "Opposite" as maybe the user holding phone naturally?
-                    // Let's just align Map Up = Real World Forward.
-                    const rotateZ = -compass;
-                    document.getElementById('map').style.transition = 'transform 0.2s linear';
-                    document.getElementById('map').style.transform = `rotate(${rotateZ}deg) scale(1.5)`;
-
-                    // Keep UI/Icons Upright
-                    document.querySelectorAll('.leaflet-marker-icon').forEach(el => {
-                        el.style.transform += ` rotate(${compass}deg)`;
-                        // Note: additive transform on markers is tricky in Leaflet without clearing basic transform. 
-                        // Simplification: Let's rotate the whole container. Markers will rotate WITH map (World Fixed).
-                        // This is actually CORRECT for a map.
-                        // The User Marker should probably stay fixed "Up" is redundant if map moves.
-                    });
-                }
-            });
+            // NO Device Orientation Rotation - Static Map (North Up)
 
         } else {
             alert("Geolocation is not supported by your browser.");
