@@ -3,15 +3,20 @@
     "name": "New Space",
     "price": 45.0,
     "available": 8,
-    "lat": 5.580515,
-    "lng": -0.14323,
+    "lat": 5.575273,
+    "lng": -0.154248,
     "owner_lat": "5.575264",
     "owner_lng": "-0.154254",
     "id": 12,
     "distance": "0.5 km",
     "trust_level": 3,
     "image_url": "https://african.land/oc-content/plugins/blog/img/blog/1822.jpg",
-    "qr_code_id": "PW-412472DD"
+    "qr_code_id": "PW-412472DD",
+    "unavailable_dates": [],
+    "unavailable_days": [],
+    "unavailable_reason": "",
+    "amenities": [],
+    "is_premium": true
   },
   {
     "name": "DVLA Space",
@@ -53,7 +58,12 @@
     "id": 15,
     "distance": "0.5 km",
     "trust_level": 3,
-    "qr_code_id": "PW-2B799058"
+    "qr_code_id": "PW-2B799058",
+    "unavailable_dates": [],
+    "unavailable_days": [],
+    "unavailable_reason": "",
+    "amenities": [],
+    "is_premium": true
   },
   {
     "name": "Shell Filling Station - Park",

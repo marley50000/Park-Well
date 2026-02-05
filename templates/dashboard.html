@@ -382,34 +382,63 @@
                         </label>
                         <label
                             style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
-                            <input type="checkbox" name="amenity" value="ev"> <ion-icon name="flash"
-                                style="color: #f59e0b;"></ion-icon> EV Charge
+                            <input type="checkbox" name="amenity" value="guarded"> <ion-icon name="person"
+                                style="color: #f59e0b;"></ion-icon> Guarded
                         </label>
                         <label
                             style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
-                            <input type="checkbox" name="amenity" value="disability"> <ion-icon name="accessibility"
-                                style="color: #8b5cf6;"></ion-icon> Accessible
-                        </label>
-                        <label
-                            style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
-                            <input type="checkbox" name="amenity" value="24/7"> <ion-icon name="time"
-                                style="color: #ec4899;"></ion-icon> 24/7
+                            <input type="checkbox" name="amenity" value="lighting"> <ion-icon name="sunny"
+                                style="color: #fde047;"></ion-icon> Lighting
                         </label>
                     </div>
                 </div>
 
-                <div style="margin-top: 1.5rem;">
-                    <button type="button" onclick="getCurrentLocation()"
-                        style="width: 100%; background: #374151; color: white; border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        <ion-icon name="locate"></ion-icon> Capture Current Location
-                    </button>
+                <!-- Premium / Safe Verification (Admin Only) -->
+                {% if is_admin %}
+                <div
+                    style="margin-top: 1rem; padding: 1rem; background: rgba(245, 158, 11, 0.1); border: 1px dashed #f59e0b; border-radius: 8px; display: flex; align-items: center; gap: 0.75rem;">
+                    <input type="checkbox" id="spotPremium" name="is_premium"
+                        style="width: 20px; height: 20px; accent-color: #f59e0b;">
+                    <div>
+                        <label for="spotPremium" style="color: white; font-weight: 700; font-size: 0.95rem;">Premium
+                            Safe Verified 🛡️</label>
+                        <p style="color: #d1d5db; font-size: 0.8rem; margin: 0;">Mark this spot as highly secure and
+                            premium.</p>
+                    </div>
                 </div>
-
-                <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">
-                    Save Spot
-                </button>
-        </form>
+                {% endif %}
+                style="color: #60a5fa;"></ion-icon> Covered
+                </label>
+                <label
+                    style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                    <input type="checkbox" name="amenity" value="ev"> <ion-icon name="flash"
+                        style="color: #f59e0b;"></ion-icon> EV Charge
+                </label>
+                <label
+                    style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                    <input type="checkbox" name="amenity" value="disability"> <ion-icon name="accessibility"
+                        style="color: #8b5cf6;"></ion-icon> Accessible
+                </label>
+                <label
+                    style="color: #d1d5db; font-size: 0.8rem; display: flex; gap: 4px; align-items: center; background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 6px; cursor: pointer;">
+                    <input type="checkbox" name="amenity" value="24/7"> <ion-icon name="time"
+                        style="color: #ec4899;"></ion-icon> 24/7
+                </label>
+            </div>
     </div>
+
+    <div style="margin-top: 1.5rem;">
+        <button type="button" onclick="getCurrentLocation()"
+            style="width: 100%; background: #374151; color: white; border: 1px solid rgba(255,255,255,0.1); padding: 0.75rem; border-radius: 0.75rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <ion-icon name="locate"></ion-icon> Capture Current Location
+        </button>
+    </div>
+
+    <button type="submit" class="btn-primary" style="justify-content: center; margin-top: 1rem;">
+        Save Spot
+    </button>
+    </form>
+</div>
 </div>
 
 <script src="https://js.paystack.co/v1/inline.js"></script>
@@ -924,6 +953,10 @@
             cb.checked = (spot.amenities || []).includes(cb.value);
         });
 
+        if (document.getElementById('spotPremium')) {
+            document.getElementById('spotPremium').checked = spot.is_premium || false;
+        }
+
         document.getElementById('spotModal').classList.remove('hidden');
 
         initAdminMap(spot.lat, spot.lng);
@@ -969,6 +1002,9 @@
             unavailable_dates: document.getElementById('spotUnavailableDates').value.split(',').map(s => s.trim()).filter(s => s),
             unavailable_days: Array.from(document.querySelectorAll('input[name="uDay"]:checked')).map(cb => cb.value),
             unavailable_reason: document.getElementById('spotUnavailableReason').value,
+
+            // Premium Logic (if visible)
+            is_premium: document.getElementById('spotPremium')?.checked || false,
 
             // Amenities Logic
             amenities: Array.from(document.querySelectorAll('input[name="amenity"]:checked')).map(cb => cb.value)

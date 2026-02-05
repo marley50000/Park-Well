@@ -251,6 +251,11 @@ def add_spot():
     
     # Amenities
     new_spot['amenities'] = new_spot.get('amenities', [])
+
+    # Premium / Safe Status (Admin Only)
+    new_spot['is_premium'] = False
+    if 'admin' in session and new_spot.get('is_premium') == True:
+        new_spot['is_premium'] = True
     
     # --- STRICT GPS SECURITY CHECK ---
     owner_lat = new_spot.get('owner_lat')
@@ -297,6 +302,10 @@ def edit_spot(spot_id):
             
             if 'trust_level' in updated_info and updated_info['trust_level']:
                  spot['trust_level'] = int(updated_info['trust_level'])
+            
+            # Premium Update (Admin Only)
+            if 'admin' in session and 'is_premium' in updated_info:
+                spot['is_premium'] = bool(updated_info['is_premium'])
             
             save_data(data)
             

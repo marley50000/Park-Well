@@ -60,6 +60,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         map.setView([latitude, longitude], map.getZoom());
                     }
 
+                    // --- ARRIVAL DETECTION ---
+                    if (isNavigating && navTargetSpot) {
+                        const distToTarget = getDistanceFromLatLonInKm(latitude, longitude, navTargetSpot.lat, navTargetSpot.lng);
+
+                        // Update Nav Card distance if active
+                        // (Optional: if we want live update on the card)
+                        const distEl = document.getElementById('navDistance');
+                        if (distEl) distEl.innerText = distToTarget.toFixed(2) + ' km to your spot';
+
+                        // Threshold: 0.05 km (50 meters)
+                        if (distToTarget < 0.05 && !window.hasArrived) {
+                            window.hasArrived = true;
+                            showArrivalWelcome(navTargetSpot);
+                            // Optional: Vibrate phone
+                            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                        }
+                    }
+
                     // Reset any rotation just in case
                     document.getElementById('map').style.transform = 'none';
                     document.getElementById('map').style.transition = 'none';
@@ -352,6 +370,11 @@ document.addEventListener('DOMContentLoaded', () => {
                                 ${spot.name}
                             </h3>
                             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px;">
+                                ${spot.is_premium ? `
+                                <div style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.3); display: flex; align-items: center; gap: 4px;">
+                                    SAFE <ion-icon name="shield-checkmark"></ion-icon>
+                                </div>
+                                ` : ''}
                                 <div style="background: ${availabilityColor}15; color: ${availabilityColor}; padding: 3px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; border: 1px solid ${availabilityColor}30; background: rgba(0,0,0,0.4);">
                                     ${availabilityText} (${spot.available})
                                 </div>
@@ -546,6 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } else if (currentFilter === 'Cheap') {
             filtered.sort((a, b) => a.price - b.price);
+        } else if (currentFilter === 'Premium') {
+            filtered = filtered.filter(s => s.is_premium);
         } else if (currentFilter === 'Bike') {
             filtered = filtered.filter(s => s.vehicle_type === 'bike');
         } else if (currentFilter === 'Truck') {
@@ -1215,4 +1240,65 @@ window.findMyCar = () => {
         localStorage.removeItem('parkedCar');
         checkParkedCar();
     }
+};
+
+// --- ARRIVAL WELCOME LOGIC ---
+window.showArrivalWelcome = (spot) => {
+    // Prevent duplicates
+    if (document.getElementById('arrivalOverlay')) return;
+
+    // Stop Navigation updates (but keep view)
+    // We don't call stopNavigation() immediately because it clears the route line which looks nice.
+    // Instead we just stop the updates.
+    window.isNavigating = false;
+    window.navTargetSpot = null;
+    document.getElementById('navControls').classList.remove('active');
+
+    const overlay = document.createElement('div');
+    overlay.id = 'arrivalOverlay';
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+        z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        animation: fadeIn 0.5s ease-out;
+    `;
+
+    overlay.innerHTML = `
+        <div style="background: linear-gradient(135deg, #1f2937, #111827); border: 1px solid rgba(255,255,255,0.1); padding: 2rem; border-radius: 24px; text-align: center; max-width: 90%; width: 350px; box-shadow: 0 0 50px rgba(99,102,241,0.5); transform: scale(0.9); animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;">
+            
+            <div style="width: 80px; height: 80px; background: #10b981; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem; box-shadow: 0 0 20px rgba(16,185,129,0.5);">
+                <ion-icon name="checkmark-circle" style="font-size: 3rem; color: white;"></ion-icon>
+            </div>
+
+            <h2 style="font-size: 1.8rem; font-weight: 800; color: white; margin-bottom: 0.5rem;">You have arrived!</h2>
+            <p style="color: #9ca3af; font-size: 1rem; margin-bottom: 2rem;">Welcome to <span style="color: #10b981; font-weight: 700;">${spot.name}</span>.</p>
+
+            <div style="display: flex; gap: 1rem; flex-direction: column;">
+                <button onclick="dismissArrival()" style="background: #6366f1; color: white; border: none; padding: 1rem; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; box-shadow: 0 4px 15px rgba(99,102,241,0.4);">
+                    Awesome, I'm here!
+                </button>
+            </div>
+        </div>
+        
+        <style>
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        </style>
+    `;
+
+    document.body.appendChild(overlay);
+};
+
+window.dismissArrival = () => {
+    const el = document.getElementById('arrivalOverlay');
+    if (el) {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 500);
+    }
+    // Clean up route line
+    if (currentRouteLayer) {
+        map.removeLayer(currentRouteLayer);
+        currentRouteLayer = null;
+    }
+    window.hasArrived = false;
 };

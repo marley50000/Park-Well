@@ -72,19 +72,17 @@
                     <ion-icon name="mic" style="font-size: 1.2rem;"></ion-icon>
                 </button>
             </div>
-            <div style="display: flex; gap: 0.5rem; overflow-x: auto; margin-top: 0.75rem; padding-bottom: 0.25rem;"
-                class="no-scrollbar">
-                <button class="filter-chip" data-val="All"
-                    style="padding: 4px 12px; border-radius: 99px; background: rgba(99,102,241,0.2); border: 1px solid #6366f1; color: white; font-size: 0.75rem;">All</button>
-                <button class="filter-chip" data-val="Nearby"
-                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Nearby</button>
-                <button class="filter-chip" data-val="Cheap"
-                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Lowest
-                    Price</button>
-                <button class="filter-chip" data-val="Bike"
-                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Bikes</button>
-                <button class="filter-chip" data-val="Truck"
-                    style="padding: 4px 12px; border-radius: 99px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af; font-size: 0.75rem;">Trucks</button>
+            <!-- Horizontal Filter Chips (Scrollable) -->
+            <div class="no-scrollbar"
+                style="display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 4px; pointer-events: auto;">
+                <button class="filter-chip active" data-val="All"
+                    style="background: rgba(99,102,241,0.2); border-color: #6366f1; color: white;">All</button>
+                <button class="filter-chip" data-val="Nearby">Nearby</button>
+                <button class="filter-chip" data-val="Cheap">Lowest Price</button>
+                <button class="filter-chip" data-val="Premium"
+                    style="border: 1px solid rgba(251, 191, 36, 0.5); color: #fbbf24;">Premium 🛡️</button>
+                <button class="filter-chip" data-val="Bike">Bikes</button>
+                <button class="filter-chip" data-val="Truck">Trucks</button>
             </div>
         </div>
     </div>
