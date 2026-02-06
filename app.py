@@ -6,142 +6,246 @@ import math
 from functools import wraps
 from flask_socketio import SocketIO, emit
 import uuid
-import copy
 from dotenv import load_dotenv
+import requests
 
 load_dotenv()
 
-# --- Undo/Redo Stacks ---
+# --- Config & Supabase Lite (No SDK Required) ---
+class SupabaseLite:
+    def __init__(self, url, key):
+        self.url = url.rstrip('/')
+        self.key = key
+        self.headers = {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=representation"
+        }
+        self.auth = AuthLite(self)
+
+    def table(self, name):
+        return TableLite(self, name)
+
+class AuthLite:
+    def __init__(self, client):
+        self.client = client
+    
+    def sign_up(self, credentials):
+        try:
+            r = requests.post(f"{self.client.url}/auth/v1/signup", 
+                            json=credentials, headers=self.client.headers)
+            # Supabase returns 200 on success, or error
+            if r.status_code == 200:
+                data = r.json()
+                return AuthResponse(data.get('user'), error=None)
+            return AuthResponse(None, error=r.json().get('msg', 'Signup failed'))
+        except Exception as e:
+            return AuthResponse(None, error=str(e))
+
+    def sign_in_with_password(self, credentials):
+        try:
+            r = requests.post(f"{self.client.url}/auth/v1/token?grant_type=password", 
+                            json=credentials, headers=self.client.headers)
+            if r.status_code == 200:
+                data = r.json()
+                return AuthResponse(data.get('user'), error=None)
+            return AuthResponse(None, error=r.json().get('error_description', 'Login failed'))
+        except Exception as e:
+            return AuthResponse(None, error=str(e))
+
+class AuthResponse:
+    def __init__(self, user, error=None):
+        self.user = user
+        self.error = error
+
+class TableLite:
+    def __init__(self, client, name):
+        self.client = client
+        self.endpoint = f"{client.url}/rest/v1/{name}"
+        self.params = {}
+        self.json_data = None
+        self.method = 'GET'
+
+    def select(self, columns="*"):
+        self.method = 'GET'
+        self.params['select'] = columns
+        return self
+
+    def insert(self, data):
+        self.method = 'POST'
+        self.json_data = data
+        return self
+
+    def update(self, data):
+        self.method = 'PATCH'
+        self.json_data = data
+        return self
+
+    def delete(self):
+        self.method = 'DELETE'
+        return self
+
+    def eq(self, column, value):
+        self.params[f"{column}"] = f"eq.{value}"
+        return self
+    
+    def order(self, column, desc=False):
+        direction = 'desc' if desc else 'asc'
+        self.params['order'] = f"{column}.{direction}"
+        return self
+
+    def execute(self):
+        try:
+            if self.method == 'GET':
+                r = requests.get(self.endpoint, headers=self.client.headers, params=self.params)
+            elif self.method == 'POST':
+                r = requests.post(self.endpoint, headers=self.client.headers, params=self.params, json=self.json_data)
+            elif self.method == 'PATCH':
+                r = requests.patch(self.endpoint, headers=self.client.headers, params=self.params, json=self.json_data)
+            elif self.method == 'DELETE':
+                r = requests.delete(self.endpoint, headers=self.client.headers, params=self.params)
+            
+            if r.status_code >= 400:
+                print(f"Supabase Error {r.status_code}: {r.text}")
+                return APIResponse(None)
+                
+            data = r.json() if r.text and 'application/json' in r.headers.get('Content-Type', '') else []
+            return APIResponse(data)
+        except Exception as e:
+            print(f"Request Error: {e}")
+            return APIResponse(None)
+
+class APIResponse:
+    def __init__(self, data):
+        self.data = data
+
+# --- App Init ---
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'parkwell_secret_key_ghana_living_legends')
+
+# Init Client
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+
+if not url or not key:
+    print("WARNING: Supabase credentials not found. DB calls will fail.")
+    supabase = None
+else:
+    supabase = SupabaseLite(url, key)
+
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 UNDO_STACK = []
 REDO_STACK = []
 MAX_HISTORY = 20
 
-app = Flask(__name__)
-app.secret_key = 'parkwell_secret_key_ghana_living_legends' # Change in production
-socketio = SocketIO(app, cors_allowed_origins="*")
+# --- Database Help ---
+def get_user_by_id(uid):
+    if not supabase: return None
+    res = supabase.table('users').select("*").eq('id', uid).execute()
+    return res.data[0] if res.data else None
 
+def create_public_user(user_data):
+    if not supabase: return
+    supabase.table('users').insert(user_data).execute()
 
-DATA_FILE = 'parking_data.json'
-TRANSACTIONS_FILE = 'transactions.json'
-SESSIONS_FILE = 'active_sessions.json'
-USERS_FILE = 'users.json'
+# (Reusing previous CRUD helpers)
+def get_all_spots():
+    if not supabase: return []
+    res = supabase.table('spots').select("*").order('id').execute()
+    return res.data or []
 
-# --- In-Memory Globals (For Vercel/Read-Only Support) ---
-# We load these once on startup. Writes update these globals + try to write to disk.
-try:
-    with open(DATA_FILE, 'r') as f:
-        MEM_DATA = json.load(f)
-except:
-    MEM_DATA = []
+def get_spot_by_id(spot_id):
+    if not supabase: return None
+    res = supabase.table('spots').select("*").eq('id', spot_id).execute()
+    return res.data[0] if res.data else None
 
-try:
-    with open(TRANSACTIONS_FILE, 'r') as f:
-        MEM_TRANSACTIONS = json.load(f)
-except:
-    MEM_TRANSACTIONS = []
+def create_spot(spot_data):
+    if not supabase: return None
+    if 'id' in spot_data: del spot_data['id']
+    res = supabase.table('spots').insert(spot_data).execute()
+    return res.data[0] if res.data else None
 
-try:
-    with open(SESSIONS_FILE, 'r') as f:
-        MEM_SESSIONS = json.load(f)
-except:
-    MEM_SESSIONS = []
+def update_spot(spot_id, updates):
+    if not supabase: return None
+    return supabase.table('spots').update(updates).eq('id', spot_id).execute()
 
-try:
-    with open(USERS_FILE, 'r') as f:
-        MEM_USERS = json.load(f)
-except:
-    # Default Demo User
-    MEM_USERS = [{
-        'id': 'user_123', 
-        'name': 'Alex Driver', 
-        'points': 120, 
-        'tier': 'Bronze',
-        'wallet_balance': 0.00,
-        'history': []
-    }]
+def delete_spot_db(spot_id):
+    if not supabase: return
+    supabase.table('spots').delete().eq('id', spot_id).execute()
 
-# --- Helpers ---
-def load_data():
-    # Return a deep copy so routes don't mutate global state in-place before saving
-    return copy.deepcopy(MEM_DATA)
+def get_sessions():
+    if not supabase: return []
+    res = supabase.table('sessions').select("*").execute()
+    return res.data or []
 
-def save_data(data, push_history=True):
-    global MEM_DATA, UNDO_STACK, REDO_STACK
+def create_session(session_data):
+    if not supabase: return
+    supabase.table('sessions').insert(session_data).execute()
+
+def delete_session(spot_id):
+    if not supabase: return
+    supabase.table('sessions').delete().eq('spot_id', spot_id).execute()
+
+def get_transactions():
+    if not supabase: return []
+    res = supabase.table('transactions').select("*").order('created_at', desc=True).execute()
+    return res.data or []
+
+def create_transaction(txn_data):
+    if not supabase: return
+    if 'id' in txn_data: del txn_data['id']
+    supabase.table('transactions').insert(txn_data).execute()
     
-    if push_history:
-        UNDO_STACK.append(copy.deepcopy(MEM_DATA))
-        if len(UNDO_STACK) > MAX_HISTORY:
-            UNDO_STACK.pop(0)
-        REDO_STACK.clear() # New action clears redo history
+def get_users():
+    if not supabase: return []
+    res = supabase.table('users').select("*").execute()
+    return res.data or []
+
+def update_user(user_id, updates):
+    if not supabase: return
+    supabase.table('users').update(updates).eq('id', user_id).execute()
+
+def push_undo_snapshot():
+    global UNDO_STACK, REDO_STACK
+    current = get_all_spots()
+    UNDO_STACK.append(current)
+    if len(UNDO_STACK) > MAX_HISTORY:
+        UNDO_STACK.pop(0)
+    REDO_STACK.clear()
+
+def restore_snapshot(snapshot):
+    if not supabase: return
+    current_ids = {s['id'] for s in get_all_spots()}
+    snapshot_ids = {s['id'] for s in snapshot}
     
-    MEM_DATA = data
+    for spot in snapshot:
+        clean = spot.copy()
+        if 'created_at' in clean: del clean['created_at']
+        if spot['id'] in current_ids:
+            update_spot(spot['id'], clean)
+        else:
+            create_spot(clean)
+            
+    for cid in current_ids:
+        if cid not in snapshot_ids:
+            delete_spot_db(cid)
+            
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371000
     try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump(data, f, indent=2)
-    except OSError:
-        pass # Ignore read-only file system errors (Vercel)
-
-def load_transactions():
-    return MEM_TRANSACTIONS
-
-def save_transaction(transaction):
-    global MEM_TRANSACTIONS
-    MEM_TRANSACTIONS.append(transaction)
-    try:
-        with open(TRANSACTIONS_FILE, 'w') as f:
-            json.dump(MEM_TRANSACTIONS, f, indent=2)
-    except OSError:
-        pass
-
-def load_sessions():
-    return MEM_SESSIONS
-
-def save_session(session_data):
-    global MEM_SESSIONS
-    MEM_SESSIONS.append(session_data)
-    try:
-        with open(SESSIONS_FILE, 'w') as f:
-            json.dump(MEM_SESSIONS, f, indent=2)
-    except OSError:
-        pass
-
-def remove_session(spot_id):
-    global MEM_SESSIONS
-    MEM_SESSIONS = [s for s in MEM_SESSIONS if s['spot_id'] != spot_id]
-    try:
-        with open(SESSIONS_FILE, 'w') as f:
-            json.dump(MEM_SESSIONS, f, indent=2)
-    except OSError:
-        pass
-
-def load_users():
-    return MEM_USERS
-
-def save_users(users):
-    global MEM_USERS
-    MEM_USERS = users
-    try:
-        with open(USERS_FILE, 'w') as f:
-            json.dump(MEM_USERS, f, indent=2)
-    except OSError:
-        pass
-
-def get_tier(points):
-    if points >= 1000: return 'Platinum'
-    if points >= 500: return 'Gold'
-    if points >= 200: return 'Silver'
-    return 'Bronze'
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'admin' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+        phi1 = math.radians(float(lat1))
+        phi2 = math.radians(float(lat2))
+        dphi = math.radians(float(lat2)-float(lat1))
+        dlam = math.radians(float(lon2)-float(lon1))
+        a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlam/2)**2
+        c = 2*math.atan2(math.sqrt(a),math.sqrt(1-a))
+        return R*c
+    except: return 9999999
 
 # --- Routes ---
-# ... (Keep existing routes same until API) ...
+
 @app.route('/')
 def home():
     return render_template('welcome.html')
@@ -154,499 +258,310 @@ def map_view():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form.get('username')
+        username = request.form.get('username') # Email
         password = request.form.get('password')
-        if username == 'admin' and password == 'password123':
-            session['admin'] = True
-            return redirect(url_for('admin_dashboard'))
-        else:
-            return render_template('login.html', error="Invalid credentials")
+        
+        # 1. Check Admin Env (Priority)
+        admin_emails = os.environ.get('ADMIN_EMAILS', 'admin').split(',')
+        if username in admin_emails and password == os.environ.get('ADMIN_PASS', 'password123'):
+             session['admin'] = True
+             session['user_id'] = 'admin'
+             return redirect(url_for('admin_dashboard'))
+
+        # 2. Check Supabase Auth (Users)
+        if supabase:
+            res = supabase.auth.sign_in_with_password({"email": username, "password": password})
+            if res.user:
+                session['user_id'] = res.user['id']
+                session['user_email'] = res.user['email']
+                # Ensure public user record exists
+                if not get_user_by_id(res.user['id']):
+                    create_public_user({
+                        'id': res.user['id'],
+                        'name': username.split('@')[0],
+                        'wallet_balance': 0.0
+                    })
+                return redirect(url_for('dashboard'))
+            else:
+                 error = res.error or "Invalid login"
+                 return render_template('login.html', error=error)
+        
+        return render_template('login.html', error="Login service unavailable")
     return render_template('login.html')
+
+@app.route('/signup', methods=['GET', 'POST'])
+def signup():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        if supabase:
+            res = supabase.auth.sign_up({"email": email, "password": password})
+            if res.user:
+                # Success - Create Public Record
+                uid = res.user['id']
+                create_public_user({
+                    'id': uid,
+                    'name': email.split('@')[0], 
+                    'wallet_balance': 0.0,
+                    'points': 0,
+                    'tier': 'Bronze'
+                })
+                
+                # Verify Logic: Supabase may require email confirm.
+                # If 'user' object has 'identities' populated, it usually means "signed up". 
+                # If confirmation is required, user can't log in yet. 
+                # We'll tell them to check email or login.
+                
+                return render_template('login.html', success="Account created! Please sign in (check email if required).")
+            else:
+                return render_template('signup.html', error=res.error or "Signup failed")
+    
+    return render_template('signup.html')
 
 @app.route('/logout')
 def logout():
-    session.pop('admin', None)
+    session.clear()
     return redirect(url_for('login'))
 
 @app.route('/dashboard')
 def dashboard():
-    # Public/User Dashboard (Always show user view, never admin controls)
-    # Pass public key for wallet topup
     pk = os.environ.get('VITE_PAYSTACK_PUBLIC_KEY', 'pk_test_placeholder')
-    return render_template('dashboard.html', is_admin=False, paystack_key=pk)
+    if 'user_id' not in session and 'admin' not in session:
+        return redirect(url_for('login'))
+    
+    is_admin = 'admin' in session
+    return render_template('dashboard.html', is_admin=is_admin, paystack_key=pk)
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
-    if 'admin' not in session:
-        return redirect(url_for('login'))
+    if 'admin' not in session: return redirect(url_for('login'))
     pk = os.environ.get('VITE_PAYSTACK_PUBLIC_KEY', 'pk_test_placeholder')
     return render_template('dashboard.html', is_admin=True, paystack_key=pk)
 
 # --- API ---
 @app.route('/api/spots', methods=['GET'])
 def get_spots():
-    return jsonify(load_data())
-
-def haversine(lat1, lon1, lat2, lon2):
-    R = 6371000  # Radius of Earth in meters
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
+    return jsonify(get_all_spots())
 
 @app.route('/api/spots', methods=['POST'])
 def add_spot():
-    # if 'admin' not in session:
-    #     return jsonify({'message': 'Unauthorized'}), 401
-    
-    # Allow community submissions (Host Mode)
-        
-    data = load_data()
+    push_undo_snapshot()
     new_spot = request.json
-    
-    # Inputs
     try:
         spot_lat = float(new_spot['lat'])
         spot_lng = float(new_spot['lng'])
     except:
         return jsonify({'message': 'Invalid coordinates'}), 400
 
-    new_spot['id'] = max([item['id'] for item in data] + [0]) + 1
-    new_spot['lat'] = spot_lat
-    new_spot['lng'] = spot_lng
-    new_spot['price'] = float(new_spot['price'])
-    new_spot['available'] = int(new_spot['available'])
-    new_spot['distance'] = "0.5 km" # Mocked for display
-    
-    # --- STRICT GPS SECURITY CHECK (Physical Presence) ---
     if 'admin' not in session:
-        # User MUST be physically present (within 100m)
         user_lat = new_spot.get('user_lat')
         user_lng = new_spot.get('user_lng')
+        if not user_lat or not user_lng: return jsonify({'message': 'Location required'}), 400
+        if haversine(spot_lat, spot_lng, user_lat, user_lng) > 100:
+            return jsonify({'message': 'Too far away'}), 403
+
+    db_spot = {
+        'name': new_spot.get('name', 'Unnamed'),
+        'price': float(new_spot.get('price', 0)),
+        'available': int(new_spot.get('available', 1)),
+        'lat': spot_lat,
+        'lng': spot_lng,
+        'trust_level': int(new_spot.get('trust_level', 3)),
+        'image_url': new_spot.get('image_url', ''),
+        'vehicle_type': new_spot.get('vehicle_type', 'car'),
+        'amenities': new_spot.get('amenities', []),
+        'qr_code_id': f"PW-{str(uuid.uuid4())[:8].upper()}",
+        'is_premium': False
+    }
+    
+    if 'admin' in session and new_spot.get('is_premium'):
+        db_spot['is_premium'] = True
+
+    # Capture Owner ID
+    if 'user_id' in session and session['user_id'] != 'admin':
+        db_spot['owner_id'] = session['user_id']
+    elif 'admin' in session:
+        db_spot['owner_id'] = 'admin'
         
-        if user_lat is None or user_lng is None:
-            return jsonify({'message': 'Location verification required.\nPlease enable GPS to prove you are at the location.'}), 400
-            
-        try:
-            # We already have haversine function in scope
-            dist_meters = haversine(spot_lat, spot_lng, float(user_lat), float(user_lng))
-        except:
-             return jsonify({'message': 'Invalid user coordinates.'}), 400
-
-        if dist_meters > 100: # 100 meters tolerance
-            return jsonify({'message': f'You are too far away ({int(dist_meters)}m).\nYou must be physically present to add this spot.'}), 403
-    # -----------------------------------------------------
-    
-    # Trust Level
-    new_spot['trust_level'] = int(new_spot.get('trust_level', 3))
-    new_spot['image_url'] = new_spot.get('image_url', '') # Media URL
-    
-    # Availability Schedule
-    new_spot['unavailable_dates'] = new_spot.get('unavailable_dates', [])
-    new_spot['unavailable_days'] = new_spot.get('unavailable_days', [])
-    new_spot['unavailable_reason'] = new_spot.get('unavailable_reason', '')
-    
-    # Amenities
-    new_spot['amenities'] = new_spot.get('amenities', [])
-
-    # Premium / Safe Status (Admin Only)
-    new_spot['is_premium'] = False
-    if 'admin' in session and new_spot.get('is_premium') == True:
-        new_spot['is_premium'] = True
-    
-    # --- STRICT GPS SECURITY CHECK ---
-    owner_lat = new_spot.get('owner_lat')
-    owner_lng = new_spot.get('owner_lng')
-    
-    # Optional: Logic to verify owner location if strict mode is on
-    # For now, we allow it but log it or just proceed
-    
-    # Generate Unique QR Code ID
-    new_spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
-    
-    data.append(new_spot)
-    save_data(data)
-    
-    # Broadcast update
+    created = create_spot(db_spot)
     socketio.emit('data_update', {'type': 'spot_added'})
-    
-    return jsonify(new_spot), 201
+    return jsonify(created), 201
+
+# ... (keep existing code) ...
+
+@app.route('/api/admin/users', methods=['GET'])
+def get_all_users_admin():
+    if 'admin' not in session: return jsonify({'error': '401'}), 401
+    return jsonify(get_users())
 
 @app.route('/api/spots/<int:spot_id>', methods=['PUT'])
 def edit_spot(spot_id):
-    # if 'admin' not in session:
-    #     return jsonify({'message': 'Unauthorized'}), 401
-
-    data = load_data()
-    updated_info = request.json
-    
-    for spot in data:
-        if spot['id'] == spot_id:
-            spot['name'] = updated_info.get('name', spot['name'])
-            spot['price'] = float(updated_info.get('price', spot['price']))
-            spot['available'] = int(updated_info.get('available', spot['available']))
-            spot['lat'] = float(updated_info.get('lat', spot['lat']))
-            spot['lng'] = float(updated_info.get('lng', spot['lng']))
-            spot['image_url'] = updated_info.get('image_url', spot.get('image_url', ''))
-            
-            # Availability Schedule
-            spot['unavailable_dates'] = updated_info.get('unavailable_dates', spot.get('unavailable_dates', []))
-            spot['unavailable_days'] = updated_info.get('unavailable_days', spot.get('unavailable_days', []))
-            spot['unavailable_reason'] = updated_info.get('unavailable_reason', spot.get('unavailable_reason', ''))
-            
-            # Amenities
-            spot['amenities'] = updated_info.get('amenities', spot.get('amenities', []))
-            
-            if 'trust_level' in updated_info and updated_info['trust_level']:
-                 spot['trust_level'] = int(updated_info['trust_level'])
-            
-            # Premium Update (Admin Only)
-            if 'admin' in session and 'is_premium' in updated_info:
-                spot['is_premium'] = bool(updated_info['is_premium'])
-            
-            save_data(data)
-            
-            # Broadcast update
-            socketio.emit('data_update', {'type': 'spot_updated'})
-            
-            return jsonify({'success': True, 'spot': spot})
-    
-    return jsonify({'success': False, 'message': 'Spot not found'}), 404
+    updates = request.json
+    clean = {}
+    allowed = ['name', 'price', 'available', 'lat', 'lng', 'amenities', 'trust_level', 'vehicle_type', 'image_url']
+    for k in allowed:
+        if k in updates: clean[k] = updates[k]
+        
+    if 'admin' in session and 'is_premium' in updates:
+        clean['is_premium'] = updates['is_premium']
+        
+    update_spot(spot_id, clean)
+    socketio.emit('data_update', {'type': 'spot_updated'})
+    return jsonify({'success': True})
 
 @app.route('/api/spots/<int:spot_id>', methods=['DELETE'])
 def delete_spot(spot_id):
-    # if 'admin' not in session:
-    #     return jsonify({'message': 'Unauthorized'}), 401
-        
-    data = load_data()
-    data = [s for s in data if s['id'] != spot_id]
-    save_data(data)
-    
-    # Cascade delete: Remove active sessions for this spot
-    remove_session(spot_id)
-    
-    # Broadcast update
+    push_undo_snapshot()
+    delete_spot_db(spot_id)
+    delete_session(spot_id)
     socketio.emit('data_update', {'type': 'spot_deleted'})
-    
     return jsonify({'success': True})
 
-import requests
-import os
-
-# Paystack Config
 PAYSTACK_SECRET_KEY = os.environ.get('PAYSTACK_SECRET_KEY')
-
-def verify_paystack_transaction(reference):
-    """
-    Verifies a Paystack transaction.
-    Returns the transaction 'data' object on success, or False/None on failure.
-    The data object contains 'amount' (in kobo), 'status', 'reference', etc.
-    """
-    if not reference: 
-        return False
-    
-    url = f"https://api.paystack.co/transaction/verify/{reference}"
-    headers = {
-        "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
-        "Content-Type": "application/json"
-    }
-    
+def verify_paystack(ref):
+    if not ref: return False
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            if data['status'] == True and data['data']['status'] == 'success':
-                return data['data'] # Return full data
-    except Exception as e:
-        print(f"Paystack verification error: {e}")
-        
+        r = requests.get(f"https://api.paystack.co/transaction/verify/{ref}", 
+            headers={"Authorization": f"Bearer {PAYSTACK_SECRET_KEY}"})
+        if r.status_code == 200 and r.json()['data']['status'] == 'success':
+            return r.json()['data']
+    except: pass
     return False
 
 @app.route('/api/user/topup', methods=['POST'])
 def topup_wallet():
-    """Secure wallet top-up via Paystack"""
-    data = request.json
-    reference = data.get('reference')
+    # Helper: Get current user ID
+    uid = session.get('user_id')
+    if not uid or uid == 'admin': return jsonify({'message': 'Login required'}), 401
     
-    if not reference:
-        return jsonify({'success': False, 'message': 'Reference required'}), 400
-        
-    # Check if reference already used in transactions (prevent replay attack)
-    transactions = load_transactions()
-    if any(t.get('payment_ref') == reference for t in transactions):
-         return jsonify({'success': False, 'message': 'Transaction reference already used'}), 400
-         
-    # Verify with Paystack
-    txn_data = verify_paystack_transaction(reference)
-    if not txn_data:
-        return jsonify({'success': False, 'message': 'Payment verification failed'}), 400
-        
-    # Get amount confirmed by Paystack (in kobo, convert to GHS)
-    amount_paid = float(txn_data['amount']) / 100.0
+    ref = request.json.get('reference')
+    data = verify_paystack(ref)
+    if not data: return jsonify({'success': False, 'message': 'Failed'}), 400
     
-    # Update User Balance
-    users = load_users()
-    user = users[0] # Demo User
+    amt = data['amount'] / 100.0
+    user = get_user_by_id(uid)
     
-    user['wallet_balance'] = user.get('wallet_balance', 0.0) + amount_paid
-    
-    # Log Transaction
-    txn = {
-        'id': int(time.time() * 1000),
-        'type': 'Deposit',
-        'amount': amount_paid,
-        'user_name': user['name'],
-        'payment_ref': reference,
-        'timestamp': time.time(),
-        'date': time.strftime("%Y-%m-%d") 
-    }
-    
-    # Update History
-    user['history'].append({
-        'action': 'Deposit',
-        'amount': amount_paid,
-        'date': time.strftime("%Y-%m-%d")
-    })
-    
-    save_users(users)
-    save_transaction(txn)
-    
-    return jsonify({
-        'success': True, 
-        'new_balance': user['wallet_balance'],
-        'message': f'Wallet funded with GH₵ {amount_paid}'
-    })
+    if user:
+        update_user(uid, {'wallet_balance': float(user['wallet_balance']) + amt})
+        create_transaction({
+            'user_id': uid, 'type': 'Deposit', 'amount': amt, 
+            'payment_ref': ref, 'date': time.strftime("%Y-%m-%d"),
+            'timestamp': time.time()
+        })
+        return jsonify({'success': True, 'message': 'Funded'})
+    return jsonify({'success': False, 'message': 'User not found'})
 
 @app.route('/api/reserve/<int:spot_id>', methods=['POST'])
 def reserve_spot(spot_id):
-    data = load_data()
-    booking_info = request.json or {}
-    print(f"DEBUG EXPLICIT: booking_info received: {booking_info}") # DEBUG
+    info = request.json or {}
+    uid = session.get('user_id')
+    # Allow anonymous simple bookings if needed, but for "Real Data" we prefer auth
+    # For now, if no auth, we fail or use temporary guest logic? 
+    # Let's enforce auth for the "Best Secured" request.
+    if not uid and 'admin' not in session:
+        return jsonify({'message': 'Please login to book'}), 401
+    if uid == 'admin': uid = 'admin_placeholder' 
+
+    spot = get_spot_by_id(spot_id)
+    if not spot or spot['available'] < 1: return jsonify({'message': 'Unavailable'}), 400
     
-    payment_method = booking_info.get('payment_method', 'paystack')
-    payment_reference = booking_info.get('payment_reference')
+    user = get_user_by_id(uid) if uid != 'admin_placeholder' else None
     
-    # --- Payment Processing ---
-    if payment_method == 'wallet':
-        users = load_users()
-        user = users[0]
-        spot = next((s for s in data if s['id'] == spot_id), None)
-        
-        if not spot: return jsonify({'message': 'Spot not found'}), 404
-        
-        current_balance = user.get('wallet_balance', 0.0)
-        if current_balance < spot['price']:
-             return jsonify({'success': False, 'message': 'Insufficient wallet balance. Please top up.'}), 400
-             
-        # Deduct
-        user['wallet_balance'] -= spot['price']
-        save_users(users) # Save immediately to lock funds
-        
-        payment_reference = f"WALLET-{int(time.time())}" # Internal Ref
-        
+    pay_method = info.get('payment_method')
+    ref = info.get('payment_reference')
+    
+    if pay_method == 'wallet':
+        if not user: return jsonify({'message': 'User not found'}), 400
+        if float(user['wallet_balance']) < spot['price']: return jsonify({'message': 'Funds too low'}), 400
+        update_user(uid, {'wallet_balance': float(user['wallet_balance']) - spot['price']})
+        ref = f"WALLET-{int(time.time())}"
     else:
-        # Paystack (Direct)
-        should_verify = True
-        if not PAYSTACK_SECRET_KEY or 'sk_test_YOUR_SECRET_KEY_HERE' in PAYSTACK_SECRET_KEY:
-            should_verify = False
-            print("DEBUG: Skipping payment verification (Key not set or placeholder)")
-            
-        if should_verify:
-             if not payment_reference:
-                 return jsonify({'success': False, 'message': 'Payment reference required'}), 400
-             
-             if not verify_paystack_transaction(payment_reference):
-                 return jsonify({'success': False, 'message': 'Payment verification failed'}), 400
+        if PAYSTACK_SECRET_KEY and 'sk_test' not in PAYSTACK_SECRET_KEY:
+             if not verify_paystack(ref): return jsonify({'message': 'Payment failed'}), 400
 
-    for spot in data:
-        if spot['id'] == spot_id:
-            if spot['available'] > 0:
-                spot['available'] -= 1
-                save_data(data)
-                
-                # Transaction
-                txn = {
-                    'id': int(time.time() * 1000),
-                    'spot_id': spot_id,
-                    'spot_name': spot['name'],
-                    'price': spot['price'],
-                    'type': 'Booking', # Added type
-                    'payment_method': payment_method,
-                    'user_name': booking_info.get('user_name', 'Walk-in Customer'),
-                    'vehicle_plate': booking_info.get('vehicle_plate', 'Unknown'),
-                    'timestamp': time.time(),
-                    'payment_ref': payment_reference
-                }
-                save_transaction(txn)
-                
-                # Active Session
-                duration = int(booking_info.get('duration', 1))
-                session_obj = {
-                    'spot_id': spot_id,
-                    'user_name': booking_info.get('user_name', 'Walk-in Customer'),
-                    'vehicle_plate': booking_info.get('vehicle_plate', 'Unknown'),
-                    'start_time': time.time(),
-                    'expiry_time': time.time() + (duration * 3600), # Hours to seconds
-                    'price': spot['price'],
-                    'payment_ref': payment_reference
-                }
-                save_session(session_obj)
-
-                # --- REWARDS SYSTEM ---
-                # Award points (e.g. 10 points per booking + 1 per dollar)
-                earned_points = 10 + int(spot['price'])
-                
-                users = load_users()
-                # Assuming single demo user for now
-                user = users[0] 
-                user['points'] += earned_points
-                user['tier'] = get_tier(user['points'])
-                user['history'].append({
-                    'action': 'Booking',
-                    'points': earned_points, 
-                    'spot': spot['name'],
-                    'date': time.strftime("%Y-%m-%d")
-                })
-                save_users(users)
-                # ----------------------
-
-                # Broadcast update (affects availability and revenue)
-                socketio.emit('data_update', {'type': 'reservation'})
-                
-                return jsonify({
-                    'success': True, 
-                    'available': spot['available'],
-                    'transaction_id': txn['id'],
-                    'new_balance': user.get('wallet_balance', 0) if payment_method == 'wallet' else None
-                })
-            else:
-                return jsonify({'success': False, 'message': 'Spot full'}), 400
-    return jsonify({'success': False, 'message': 'Spot not found'}), 404
+    update_spot(spot_id, {'available': spot['available'] - 1})
+    
+    create_transaction({
+        'user_id': uid, 'spot_id': spot_id, 'type': 'Booking',
+        'amount': spot['price'], 'spot_name': spot['name'],
+        'payment_ref': ref, 'date': time.strftime("%Y-%m-%d"),
+        'vehicle_plate': info.get('vehicle_plate'),
+        'timestamp': time.time()
+    })
+    
+    create_session({
+        'spot_id': spot_id, 'user_name': user['name'] if user else 'Guest',
+        'vehicle_plate': info.get('vehicle_plate'),
+        'start_time': time.time(),
+        'expiry_time': time.time() + (int(info.get('duration', 1)) * 3600),
+        'price': spot['price'], 'payment_ref': ref
+    })
+    
+    socketio.emit('data_update', {'type': 'reservation'})
+    return jsonify({'success': True})
 
 @app.route('/api/admin/sessions', methods=['GET'])
 def get_active_sessions():
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
-    return jsonify(load_sessions())
+    if 'admin' not in session: return jsonify({'error': '401'}), 401
+    return jsonify(get_sessions())
 
 @app.route('/api/admin/cancel_booking', methods=['POST'])
 def cancel_booking():
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
-
-    data = load_data()
-    req = request.json
-    spot_id = req.get('spot_id')
-
-    for spot in data:
-        if spot['id'] == spot_id:
-            # security: simple increment
-            spot['available'] += 1
-            save_data(data)
-            
-            # Remove from active sessions
-            remove_session(spot_id)
-
-            # Broadcast force end
-            socketio.emit('force_end_session', {'spot_id': spot_id, 'message': 'Admin cancelled the session due to an issue.'})
-            socketio.emit('data_update', {'type': 'cancellation'})
-
-            return jsonify({'success': True, 'message': 'Session cancelled, spot freed.'})
-
-    # If spot not found, check if we have a zombie session to clean up
-    sessions = load_sessions()
-    zombie = next((s for s in sessions if s['spot_id'] == spot_id), None)
-    if zombie:
-        remove_session(spot_id)
+    if 'admin' not in session: return jsonify({'error': '401'}), 401
+    sid = request.json.get('spot_id')
+    spot = get_spot_by_id(sid)
+    if spot:
+        update_spot(sid, {'available': spot['available'] + 1})
+        delete_session(sid)
         socketio.emit('data_update', {'type': 'cancellation'})
-        return jsonify({'success': True, 'message': 'Orphaned session removed.'})
-
-    return jsonify({'success': False, 'message': 'Spot not found'}), 404
+        return jsonify({'success': True})
+    return jsonify({'error': '404'})
 
 @app.route('/api/admin/undo', methods=['POST'])
-def undo_action():
-    if 'admin' not in session: return jsonify({'message': 'Unauthorized'}), 401
-    
-    global MEM_DATA, UNDO_STACK, REDO_STACK
-    if not UNDO_STACK:
-        return jsonify({'success': False, 'message': 'Nothing to undo'})
-    
-    # Push current to redo
-    REDO_STACK.append(copy.deepcopy(MEM_DATA))
-    
-    # Restore from undo
-    prev_state = UNDO_STACK.pop()
-    save_data(prev_state, push_history=False) # Don't push to undo stack again
-    
-    # Broadcast
-    socketio.emit('data_update', {'type': 'undo'})
-    return jsonify({'success': True, 'message': 'Action undone'})
-
-@app.route('/api/admin/redo', methods=['POST'])
-def redo_action():
-    if 'admin' not in session: return jsonify({'message': 'Unauthorized'}), 401
-    
-    global MEM_DATA, UNDO_STACK, REDO_STACK
-    if not REDO_STACK:
-        return jsonify({'success': False, 'message': 'Nothing to redo'})
-        
-    # Push current to undo as if it's a new action (but we orchestrate it)
-    UNDO_STACK.append(copy.deepcopy(MEM_DATA))
-    
-    # Restore from redo
-    next_state = REDO_STACK.pop()
-    save_data(next_state, push_history=False)
-    
-    socketio.emit('data_update', {'type': 'redo'})
-    return jsonify({'success': True, 'message': 'Action redone'})
-
-@app.route('/receipt/<int:txn_id>')
-def view_receipt(txn_id):
-    transactions = load_transactions()
-    txn = next((t for t in transactions if t['id'] == txn_id), None)
-    if not txn:
-        return "Receipt not found", 404
-    return render_template('receipt.html', txn=txn)
-
-@app.route('/qrcode/<int:spot_id>')
-def print_qr(spot_id):
-    if 'admin' not in session:
-        return redirect(url_for('login'))
-        
-    data = load_data()
-    spot = next((s for s in data if s['id'] == spot_id), None)
-    if not spot:
-        return "Spot not found", 404
-    
-    # Ensure QR ID exists for older data
-    if 'qr_code_id' not in spot:
-        spot['qr_code_id'] = f"PW-{str(uuid.uuid4())[:8].upper()}"
-        save_data(data)
-        
-    return render_template('qrcode.html', spot=spot)
+def undo():
+    if 'admin' not in session: return jsonify({'error': '401'}), 401
+    if UNDO_STACK:
+        restore_snapshot(UNDO_STACK.pop())
+        socketio.emit('data_update', {'type': 'undo'})
+        return jsonify({'success': True})
+    return jsonify({'success': False})
 
 @app.route('/api/analytics', methods=['GET'])
-def get_analytics():
-    if 'admin' not in session:
-        return jsonify({'message': 'Unauthorized'}), 401
-        
-    transactions = load_transactions()
-    total_revenue = sum(t['price'] for t in transactions)
-    recent_transactions = sorted(transactions, key=lambda x: x['timestamp'], reverse=True)[:10]
-    
+def analytics():
+    if 'admin' not in session: return jsonify({'error': '401'}), 401
+    txns = get_transactions()
     return jsonify({
-        'revenue': total_revenue,
-        'total_bookings': len(transactions),
-        'recent_activity': recent_transactions
+        'revenue': sum(float(x['amount'] or 0) for x in txns),
+        'total_bookings': len([t for t in txns if t['type']=='Booking']),
+        'recent_activity': txns[:10]
     })
 
 @app.route('/api/user/profile', methods=['GET'])
-def get_user_profile():
-    # Return the demo user
-    return jsonify(load_users()[0])
+def profile():
+    uid = session.get('user_id')
+    if not uid: return jsonify({'error': 'Not logged in'}), 401
+    
+    u = get_user_by_id(uid)
+    if not u:
+        # Fallback if somehow missing
+        u = {'id': uid, 'name': 'User', 'wallet_balance': 0.0, 'points': 0}
+        
+    txns = get_transactions()
+    u['history'] = [{'action': t['type'], 'amount': t['amount'], 'date': t['date'], 'spot': t.get('spot_name')} 
+                    for t in txns if t.get('user_id') == uid]
+    return jsonify(u)
+
+@app.route('/qrcode/<int:spot_id>')
+def qr(spot_id):
+    s = get_spot_by_id(spot_id)
+    return render_template('qrcode.html', spot=s) if s else "404", 404
+
+@app.route('/receipt/<int:txn_id>')
+def receipt(txn_id):
+    txns = get_transactions()
+    t = next((x for x in txns if str(x['id']) == str(txn_id)), None)
+    return render_template('receipt.html', txn=t) if t else "404", 404
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, port=5000)

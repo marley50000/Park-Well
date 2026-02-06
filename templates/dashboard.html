@@ -65,7 +65,8 @@
                 <span class="admin-badge"
                     style="background: rgba(245, 158, 11, 0.1); color: #f59e0b; padding: 4px 12px; border-radius: 99px; font-size: 0.75rem; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.2);">ADMIN</span>
                 {% else %}
-                <span style="color: #9ca3af; display: none; @media(min-width: 768px){display:inline;}">Welcome,
+                <span id="userGreeting"
+                    style="color: #9ca3af; display: none; @media(min-width: 768px){display:inline;}">Welcome,
                     Driver</span>
                 {% endif %}
 
@@ -468,6 +469,10 @@
                 // Update Balance
                 document.getElementById('dashWalletBalance').innerText = 'GH₵ ' + (user.wallet_balance || 0).toFixed(2);
 
+                // Update Greeting
+                const greetEl = document.getElementById('userGreeting');
+                if (greetEl) greetEl.innerText = 'Welcome, ' + (user.name || 'Driver');
+
                 // Update History
                 const list = document.getElementById('transactionList');
                 if (!user.history || user.history.length === 0) {
@@ -700,136 +705,153 @@
     }
 
     // --- ADMIN LOGIC ---
+    let globalAdminSpots = [];
+
     function fetchAdminSpots() {
-        console.log("Fetching admin spots & sessions");
+        console.log("Fetching admin spots & sessions & users");
 
         Promise.all([
             fetch('/api/spots').then(r => r.json()),
-            fetch('/api/admin/sessions').then(r => r.json())
-        ]).then(([spots, sessions]) => {
-            const list = document.getElementById('adminSpotsList');
-            if (spots.length === 0) {
-                list.innerHTML = '<div style="padding: 1rem; color: #9ca3af; text-align: center;">No spots found.</div>';
-                return;
-            }
+            fetch('/api/admin/sessions').then(r => r.json()),
+            fetch('/api/admin/users').then(r => r.json())
+        ]).then(([spots, sessions, users]) => {
 
-            const now = Date.now() / 1000; // Seconds
-
-            list.innerHTML = spots.map(s => {
-                // Find active session for this spot
-                // Note: simplified logic assuming 1 session per spot for now, though data model allows array.
-                // We grab the most recent session for this spot if available.
-                const session = sessions.find(sess => sess.spot_id == s.id);
-
-                let statusHtml = '';
-                let overtimeHtml = '';
-
-                if (session) {
-                    const timeLeft = session.expiry_time - now;
-                    const isOvertime = timeLeft < 0;
-
-                    if (isOvertime) {
-                        const overdueMins = Math.floor(Math.abs(timeLeft) / 60);
-                        const penalty = (overdueMins / 60) * s.price * 2; // Double rate penalty logic
-
-                        overtimeHtml = `
-                        <div style="margin-top: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 6px; padding: 0.75rem;">
-                            <div style="color: #ef4444; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
-                                <ion-icon name="warning"></ion-icon> OVERTIME ACTIVE
-                            </div>
-                            <div style="font-size: 0.75rem; color: #fca5a5; margin-top: 4px;">FINE ACCRUING</div>
-                            <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; align-items: flex-end;">
-                                <div style="font-weight: 700; color: white;">+${overdueMins}m overdue</div>
-                                <div style="text-align: right;">
-                                    <div style="font-size: 0.7rem; color: #9ca3af;">Current Penalty</div>
-                                    <div style="font-weight: 700; color: #fbbf24;">GH₵ ${penalty.toFixed(1)}</div>
-                                </div>
-                            </div>
-                        </div>`;
-
-                        statusHtml = `<span style="color: #ef4444; font-weight: 700;">Occupied (Overtime)</span>`;
-                    } else {
-                        const minsLeft = Math.floor(timeLeft / 60);
-                        statusHtml = `<span style="color: #f59e0b; font-weight: 700;">Occupied (${minsLeft}m left)</span>`;
-                    }
-                } else {
-                    statusHtml = `<span style="color: ${s.available > 0 ? '#10b981' : '#ef4444'}">${s.available} spaces</span>`;
+            // Map users for O(1) lookup
+            globalAdminSpots = spots.map(s => {
+                let ownerName = 'Unknown';
+                if (s.owner_id === 'admin') {
+                    ownerName = 'Admin';
+                } else if (s.owner_id) {
+                    const u = users.find(x => x.id == s.owner_id);
+                    if (u) ownerName = u.name || u.email || 'User';
                 }
 
-                return `
-                <div style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
-                            <div style="font-weight: 700; color: white; font-size: 1.1rem;">${s.name}</div>
-                            <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 4px;">
-                                ${statusHtml} 
-                                • GH₵ ${s.price}/hr
-                            </div>
-                            ${session ? `<div style="font-size: 0.8rem; color: #9ca3af; margin-top: 2px;">Plate: <span style="font-family: monospace; color: white;">${session.vehicle_plate}</span></div>` : ''}
-                        </div>
-                        <!-- Emergency Cancel -->
-                        <button onclick="adminCancelSession(${s.id})" title="Force Cancel Session"
-                            style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
-                            Force Cancel
-                        </button>
-                    </div>
-                    
-                    ${overtimeHtml}
-                    
-                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: ${overtimeHtml ? '0.5rem' : '0'};">
-                        <!-- Edit -->
-                        <!-- Edit -->
-                        <button onclick='openEditSpotModal(${JSON.stringify(s).replace(/'/g, "&#39;")})' 
-                            style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
-                            <ion-icon name="create"></ion-icon> Edit
-                        </button>
-                        
-                        <!-- QR Code -->
-                        <a href="/qrcode/${s.id}" target="_blank"
-                            style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; text-decoration: none;">
-                            <ion-icon name="qr-code"></ion-icon> Print QR
-                        </a>
+                s._ownerName = ownerName;
+                s._session = sessions.find(sess => sess.spot_id == s.id);
+                return s;
+            });
 
-                        <!-- Delete -->
-                        <button onclick="deleteSpot(${s.id})" 
-                            style="background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
-                            <ion-icon name="trash"></ion-icon> Delete
-                        </button>
-                    </div>
-                </div>
-                `;
-            }).join('');
+            renderAdminSpots(globalAdminSpots);
 
-            // --- ORPHANED SESSIONS (Bug Fix) ---
             const spotIds = new Set(spots.map(s => s.id));
             const orphans = sessions.filter(s => !spotIds.has(s.spot_id));
-
-            if (orphans.length > 0) {
-                list.innerHTML += `
-                    <div style="margin-top: 2rem; border-top: 1px dashed rgba(239, 68, 68, 0.4); padding-top: 1rem;">
-                        <h4 style="color: #ef4444; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-                            <ion-icon name="warning"></ion-icon> Orphaned Sessions (Spot Deleted)
-                        </h4>
-                        <div style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 1rem;">These sessions are active but their spot no longer exists.</div>
-                        <div style="display: flex; flex-direction: column; gap: 1rem;">
-                `;
-
-                list.innerHTML += orphans.map(s => `
-                    <div style="padding: 1rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
-                         <div>
-                            <div style="font-weight: 700; color: #fca5a5;">Stuck Session (Spot #${s.spot_id})</div>
-                            <div style="font-size: 0.8rem; color: #9ca3af;">User: ${s.user_name} | Plate: ${s.vehicle_plate}</div>
-                         </div>
-                         <button onclick="adminCancelSession(${s.spot_id})" 
-                            style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                            Force Clear
-                         </button>
-                    </div>
-                `).join('');
-
-                list.innerHTML += `</div></div>`;
-            }
+            renderOrphans(orphans);
         });
+    }
+
+    function renderAdminSpots(spots) {
+        const list = document.getElementById('adminSpotsList');
+        list.innerHTML = '';
+
+        if (spots.length === 0) {
+            list.innerHTML = '<div style="padding: 1rem; color: #9ca3af; text-align: center;">No spots found matching filters.</div>';
+            return;
+        }
+
+        const now = Date.now() / 1000;
+
+        list.innerHTML = spots.map(s => {
+            const session = s._session;
+            let statusHtml = '';
+            let overtimeHtml = '';
+
+            if (session) {
+                const timeLeft = session.expiry_time - now;
+                const isOvertime = timeLeft < 0;
+
+                if (isOvertime) {
+                    const overdueMins = Math.floor(Math.abs(timeLeft) / 60);
+                    const penalty = (overdueMins / 60) * s.price * 2;
+
+                    overtimeHtml = `
+                    <div style="margin-top: 0.5rem; background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 6px; padding: 0.75rem;">
+                        <div style="color: #ef4444; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                            <ion-icon name="warning"></ion-icon> OVERTIME ACTIVE
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; align-items: flex-end;">
+                            <div style="font-weight: 700; color: white;">+${overdueMins}m overdue</div>
+                            <div style="font-weight: 700; color: #fbbf24;">GH₵ ${penalty.toFixed(1)} penalty</div>
+                        </div>
+                    </div>`;
+                    statusHtml = `<span style="color: #ef4444; font-weight: 700;">Occupied (Overtime)</span>`;
+                } else {
+                    const minsLeft = Math.floor(timeLeft / 60);
+                    statusHtml = `<span style="color: #f59e0b; font-weight: 700;">Occupied (${minsLeft}m left)</span>`;
+                }
+            } else {
+                statusHtml = `<span style="color: ${s.available > 0 ? '#10b981' : '#ef4444'}">${s.available} spaces</span>`;
+            }
+
+            return `
+            <div style="padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; flex-direction: column; gap: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: start;">
+                    <div>
+                        <div style="font-weight: 700; color: white; font-size: 1.1rem;">${s.name}</div>
+                        <div style="font-size: 0.85rem; color: #9ca3af; margin-top: 4px;">
+                            ${statusHtml} • GH₵ ${s.price}/hr
+                        </div>
+                        <div style="font-size: 0.8rem; color: #6366f1; margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                            <ion-icon name="person-circle"></ion-icon> Listed by: <span style="color: #e0e7ff;">${s._ownerName}</span>
+                        </div>
+                        ${session ? `<div style="font-size: 0.8rem; color: #9ca3af; margin-top: 2px;">Plate: <span style="font-family: monospace; color: white;">${session.vehicle_plate}</span></div>` : ''}
+                    </div>
+                    <button onclick="adminCancelSession(${s.id})" title="Force Cancel Session"
+                        style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; color: #ef4444; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600;">
+                        Force Cancel
+                    </button>
+                </div>
+                ${overtimeHtml}
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: ${overtimeHtml ? '0.5rem' : '0'};">
+                     <button onclick='openEditSpotModal(${JSON.stringify(s).replace(/'/g, "&#39;")})' 
+                         style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                         <ion-icon name="create"></ion-icon> Edit
+                     </button>
+                     <a href="/qrcode/${s.id}" target="_blank"
+                         style="background: rgba(255,255,255,0.1); border: none; color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem; text-decoration: none;">
+                         <ion-icon name="qr-code"></ion-icon> QR
+                     </a>
+                     <button onclick="deleteSpot(${s.id})" 
+                         style="background: rgba(239, 68, 68, 0.1); border: none; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 0.8rem;">
+                         <ion-icon name="trash"></ion-icon> Delete
+                     </button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderOrphans(orphans) {
+        const list = document.getElementById('adminSpotsList');
+        if (orphans.length > 0) {
+            list.innerHTML += `
+                <div style="margin-top: 2rem; border-top: 1px dashed rgba(239, 68, 68, 0.4); padding-top: 1rem;">
+                    <h4 style="color: #ef4444; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                        <ion-icon name="warning"></ion-icon> Orphaned Sessions (Spot Deleted)
+                    </h4>
+                    <div style="font-size: 0.8rem; color: #9ca3af; margin-bottom: 1rem;">These sessions are active but their spot no longer exists.</div>
+                    <div style="display: flex; flex-direction: column; gap: 1rem;">
+            ` + orphans.map(s => `
+                <div style="padding: 1rem; border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(239, 68, 68, 0.05); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                        <div style="font-weight: 700; color: #fca5a5;">Stuck Session (Spot #${s.spot_id})</div>
+                        <div style="font-size: 0.8rem; color: #9ca3af;">User: ${s.user_name} | Plate: ${s.vehicle_plate}</div>
+                        </div>
+                        <button onclick="adminCancelSession(${s.spot_id})" 
+                        style="background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Force Clear
+                        </button>
+                </div>
+            `).join('') + `</div></div>`;
+        }
+    }
+
+    function filterAdminSpots() {
+        const query = document.getElementById('adminSearchInput').value.toLowerCase();
+        const filtered = globalAdminSpots.filter(s =>
+            (s.name && s.name.toLowerCase().includes(query)) ||
+            (s._ownerName && s._ownerName.toLowerCase().includes(query))
+        );
+        renderAdminSpots(filtered);
     }
 
     function adminCancelSession(spotId) {
@@ -995,8 +1017,8 @@
             lng: document.getElementById('spotLng').value,
             image_url: document.getElementById('spotImage').value,
             // For security check logic (mocking physical presence if creating new)
-            owner_lat: document.getElementById('spotLat').value,
-            owner_lng: document.getElementById('spotLng').value,
+            user_lat: document.getElementById('spotLat').value,
+            user_lng: document.getElementById('spotLng').value,
 
             // Availability Logic
             unavailable_dates: document.getElementById('spotUnavailableDates').value.split(',').map(s => s.trim()).filter(s => s),

@@ -1,5 +1,5 @@
-Flask
-Flask-SocketIO
-requests
+flask
+flask_socketio
 python-dotenv
-
+requests
+gunicorn
