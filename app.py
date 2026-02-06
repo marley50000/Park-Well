@@ -11,6 +11,8 @@ import requests
 
 load_dotenv()
 
+from datetime import timedelta
+
 # --- Config & Supabase Lite (No SDK Required) ---
 class SupabaseLite:
     def __init__(self, url, key):
@@ -123,6 +125,41 @@ class APIResponse:
 # --- App Init ---
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'parkwell_secret_key_ghana_living_legends')
+
+# --- Security Configuration ---
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
+app.config['SESSION_COOKIE_HTTPONLY'] = True # Prevent JS access to session cookie
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax' # CSRF protection
+# app.config['SESSION_COOKIE_SECURE'] = True # Un-comment in Production (HTTPS only)
+
+# Security Headers & Inactivity Check
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
+
+@app.before_request
+def check_inactivity_and_security():
+    session.permanent = True # Ensure lifetime is respected
+    
+    # Exempt routes from timeout check
+    if request.endpoint in ('static', 'login', 'signup', 'home', 'topup_wallet', 'reserve_spot'):
+        return
+
+    # Check Inactivity
+    now = time.time()
+    last_active = session.get('last_active')
+    
+    # If logged in and inactive for > 5 mins
+    if 'user_id' in session or 'admin' in session:
+        if last_active and (now - last_active > 300): # 300 seconds = 5 mins
+            session.clear()
+            return redirect(url_for('login', error="Session timed out due to inactivity."))
+        
+        # Update activity timestamp
+        session['last_active'] = now
 
 # Init Client
 url: str = os.environ.get("SUPABASE_URL")
@@ -262,8 +299,7 @@ def login():
         password = request.form.get('password')
         
         # 1. Check Admin Env (Priority)
-        admin_emails = os.environ.get('ADMIN_EMAILS', 'admin').split(',')
-        if username in admin_emails and password == os.environ.get('ADMIN_PASS', 'password123'):
+        if username == os.environ.get('ADMIN_USER', 'admin') and password == os.environ.get('ADMIN_PASS', 'password123'):
              session['admin'] = True
              session['user_id'] = 'admin'
              return redirect(url_for('admin_dashboard'))
